@@ -1,0 +1,3556 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GST Reconciliation Tool | Books vs GSTR-2B</title>
+  <!-- SheetJS (xlsx) from cdnjs for in-browser Excel reading & generation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --bg-body: #f8fafc;
+      --bg-surface: #ffffff;
+      --bg-surface-alt: #f1f5f9;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --border-focus: #3b82f6;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-light: #eff6ff;
+      --success: #10b981;
+      --success-light: #ecfdf5;
+      --warning: #f59e0b;
+      --warning-light: #fffbeb;
+      --danger: #ef4444;
+      --danger-light: #fef2f2;
+      --info: #6366f1;
+      --info-light: #eef2ff;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+      --radius: 10px;
+      --radius-sm: 6px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    [data-theme="dark"] {
+      --bg-body: #090d16;
+      --bg-surface: #111827;
+      --bg-surface-alt: #1f2937;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --border-focus: #60a5fa;
+      --primary: #3b82f6;
+      --primary-hover: #60a5fa;
+      --primary-light: rgba(59, 130, 246, 0.15);
+      --success-light: rgba(16, 185, 129, 0.15);
+      --warning-light: rgba(245, 158, 11, 0.15);
+      --danger-light: rgba(239, 68, 68, 0.15);
+      --info-light: rgba(99, 102, 241, 0.15);
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+      --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+      --shadow-lg: 0 10px 20px -3px rgb(0 0 0 / 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font);
+      background-color: var(--bg-body);
+      color: var(--text-main);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.2s ease, color 0.2s ease;
+    }
+
+    /* Header & Nav */
+    header {
+      background: var(--bg-surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .header-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0.85rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, #2563eb, #7c3aed);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 1.25rem;
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.35);
+    }
+
+    .brand-text h1 {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .brand-badge {
+      font-size: 0.7rem;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: var(--primary-light);
+      color: var(--primary);
+      font-weight: 600;
+      border: 1px solid rgba(37, 99, 235, 0.2);
+    }
+
+    .brand-text p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1.1rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      user-select: none;
+      white-space: nowrap;
+    }
+
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+      box-shadow: 0 2px 4px rgba(37, 99, 235, 0.25);
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: var(--primary-hover);
+      box-shadow: 0 4px 8px rgba(37, 99, 235, 0.35);
+    }
+
+    .btn-outline {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border-color: var(--border);
+    }
+
+    .btn-outline:hover:not(:disabled) {
+      background: var(--bg-surface-alt);
+      border-color: var(--text-muted);
+    }
+
+    .btn-sm {
+      padding: 0.35rem 0.75rem;
+      font-size: 0.8rem;
+    }
+
+    .btn-success {
+      background: var(--success);
+      color: white;
+    }
+
+    .btn-success:hover:not(:disabled) {
+      filter: brightness(0.92);
+    }
+
+    .theme-toggle {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+    }
+
+    /* Privacy Banner */
+    .privacy-banner {
+      background: #ecfdf5;
+      color: #065f46;
+      border-bottom: 1px solid #a7f3d0;
+      padding: 0.45rem 1.5rem;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      text-align: center;
+    }
+
+    [data-theme="dark"] .privacy-banner {
+      background: rgba(16, 185, 129, 0.12);
+      color: #6ee7b7;
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+
+    /* Stepper */
+    .stepper-wrapper {
+      max-width: 1400px;
+      margin: 1.5rem auto 0;
+      padding: 0 1.5rem;
+      width: 100%;
+    }
+
+    .stepper {
+      display: flex;
+      justify-content: space-between;
+      position: relative;
+      background: var(--bg-surface);
+      padding: 1rem 1.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      z-index: 2;
+      opacity: 0.5;
+      transition: all 0.2s ease;
+    }
+
+    .step-item.active {
+      opacity: 1;
+    }
+
+    .step-item.completed {
+      opacity: 0.9;
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--bg-surface-alt);
+      border: 2px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .step-item.active .step-num {
+      background: var(--primary);
+      border-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 0 4px var(--primary-light);
+    }
+
+    .step-item.completed .step-num {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+
+    .step-label {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .step-desc {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    /* Main Container */
+    main {
+      max-width: 1400px;
+      margin: 1.5rem auto;
+      padding: 0 1.5rem 3rem;
+      width: 100%;
+      flex: 1;
+    }
+
+    .step-view {
+      display: none;
+      animation: fadeIn 0.25s ease-out;
+    }
+
+    .step-view.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Card styling */
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 1.5rem;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 1.1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.15rem;
+    }
+
+    .card-body {
+      padding: 1.5rem;
+    }
+
+    /* Upload Grid */
+    .upload-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 860px) {
+      .upload-grid {
+        grid-template-columns: 1fr;
+      }
+      .stepper {
+        flex-direction: column;
+        gap: 1rem;
+      }
+    }
+
+    .drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      background: var(--bg-surface-alt);
+      padding: 2.2rem 1.5rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .drop-zone:hover, .drop-zone.dragover {
+      border-color: var(--primary);
+      background: var(--primary-light);
+    }
+
+    .drop-icon {
+      font-size: 2.8rem;
+      margin-bottom: 0.75rem;
+      display: inline-block;
+      line-height: 1;
+    }
+
+    .drop-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+
+    .drop-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .file-input-hidden {
+      display: none;
+    }
+
+    .file-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--bg-surface);
+      padding: 0.45rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      margin-top: 0.75rem;
+      color: var(--text-main);
+      position: relative;
+      z-index: 10;
+    }
+
+    .file-pill .clear-btn {
+      color: var(--danger);
+      cursor: pointer;
+      margin-left: 0.5rem;
+      font-weight: bold;
+      font-size: 1.25rem;
+      line-height: 1;
+      padding: 0 0.35rem;
+      border-radius: 50%;
+      background: none;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+
+    .file-pill .clear-btn:hover {
+      background: rgba(239, 68, 68, 0.18);
+      color: #dc2626;
+      transform: scale(1.2);
+    }
+
+    /* Configuration Panel */
+    .config-panel {
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      align-items: center;
+      margin-bottom: 1.5rem;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-main);
+      margin-bottom: 0.35rem;
+    }
+
+    .form-group .helper {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    .input-control {
+      width: 100%;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .input-control:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    }
+
+    /* Column Mapping Table */
+    .mapping-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .mapping-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .mapping-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .mapping-table th, .mapping-table td {
+      padding: 0.65rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+
+    .mapping-table th {
+      background: var(--bg-surface-alt);
+      font-weight: 700;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .req-star {
+      color: var(--danger);
+      font-weight: bold;
+    }
+
+    .auto-badge {
+      font-size: 0.68rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--success-light);
+      color: var(--success);
+      font-weight: 600;
+      margin-left: 0.4rem;
+    }
+
+    /* Preview tables */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      margin-top: 1rem;
+      max-height: 280px;
+      background: var(--bg-surface);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      white-space: nowrap;
+    }
+
+    .data-table th, .data-table td {
+      padding: 0.55rem 0.85rem;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    .data-table th {
+      background: var(--bg-surface-alt);
+      position: sticky;
+      top: 0;
+      font-weight: 700;
+      z-index: 2;
+      color: var(--text-main);
+    }
+
+    .data-table tr:hover {
+      background: var(--bg-surface-alt);
+    }
+
+    /* Dashboard Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .metric-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.25rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 4px;
+      height: 100%;
+    }
+
+    .metric-card.matched::before { background: var(--success); }
+    .metric-card.partial::before { background: var(--warning); }
+    .metric-card.missing-2b::before { background: var(--danger); }
+    .metric-card.missing-books::before { background: var(--info); }
+    .metric-card.total::before { background: var(--primary); }
+
+    .metric-title {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      margin-bottom: 0.35rem;
+    }
+
+    .metric-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .metric-sub {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.35rem;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .metric-sub strong {
+      color: var(--text-main);
+    }
+
+    /* Charts Row */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
+
+    .chart-box h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      align-self: flex-start;
+    }
+
+    .chart-canvas-container {
+      width: 100%;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    canvas {
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .badge-matched { background: var(--success-light); color: var(--success); }
+    .badge-partial { background: var(--warning-light); color: var(--warning); }
+    .badge-missing-2b { background: var(--danger-light); color: var(--danger); }
+    .badge-missing-books { background: var(--info-light); color: var(--info); }
+    .badge-duplicate { background: var(--bg-surface-alt); color: var(--text-muted); border: 1px solid var(--border); }
+    .badge-invalid { background: #fee2e2; color: #991b1b; }
+
+    /* Results Table Toolbar */
+    .table-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 1rem 1.25rem;
+      background: var(--bg-surface-alt);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 0.35rem 0.8rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+      background: var(--bg-surface);
+    }
+
+    .tab-btn.active {
+      background: var(--bg-surface);
+      color: var(--primary);
+      border-color: var(--border);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .search-box {
+      position: relative;
+      min-width: 240px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 0.45rem 0.75rem 0.45rem 2rem;
+      font-size: 0.82rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text-main);
+      outline: none;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 0.65rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    /* Pagination */
+    .pagination-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1.25rem;
+      border-top: 1px solid var(--border);
+      background: var(--bg-surface);
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      padding: 1.5rem;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-surface);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow-lg);
+      width: 100%;
+      max-width: 820px;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalPop {
+      from { transform: scale(0.96); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+
+    .modal-header {
+      padding: 1.1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+    }
+
+    .modal-close {
+      font-size: 1.3rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+      overflow-y: auto;
+    }
+
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-top: 1rem;
+    }
+
+    .compare-side {
+      background: var(--bg-surface-alt);
+      padding: 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+    }
+
+    .compare-side h4 {
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+      color: var(--primary);
+    }
+
+    .prop-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.35rem 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.8rem;
+    }
+
+    .prop-row:last-child {
+      border-bottom: none;
+    }
+
+    .prop-key {
+      color: var(--text-muted);
+    }
+
+    .prop-val {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(4px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 150;
+      color: #fff;
+    }
+
+    .loading-overlay.active {
+      display: flex;
+    }
+
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(255, 255, 255, 0.2);
+      border-top-color: #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 1rem;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .loading-text {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+
+    .loading-sub {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      margin-top: 0.35rem;
+    }
+
+    /* Demo Data banner */
+    .demo-bar {
+      background: linear-gradient(90deg, #eff6ff, #f0fdf4);
+      border: 1px dashed #93c5fd;
+      border-radius: var(--radius);
+      padding: 0.9rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+
+    [data-theme="dark"] .demo-bar {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .mapping-warning-box {
+      background: #fffbeb;
+      border: 1px solid #f59e0b;
+      color: #92400e;
+      padding: 0.85rem 1.15rem;
+      border-radius: var(--radius-sm);
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    [data-theme="dark"] .mapping-warning-box {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.4);
+      color: #fde68a;
+    }
+
+    .select-conflict {
+      border-color: #f59e0b !important;
+      background-color: #fffbeb !important;
+      color: #92400e !important;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25) !important;
+    }
+
+    [data-theme="dark"] .select-conflict {
+      border-color: #f59e0b !important;
+      background-color: rgba(245, 158, 11, 0.15) !important;
+      color: #fde68a !important;
+    }
+
+    .diff-highlight {
+      color: var(--danger);
+      font-weight: 700;
+    }
+
+    .sort-icon {
+      margin-left: 0.25rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+
+    /* Sheet List Preview in Step 4 */
+    .sheet-card-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .sheet-card {
+      background: var(--bg-surface-alt);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+    }
+
+    .sheet-card-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #10b981;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+    }
+
+    .sheet-card-info h4 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 0.2rem;
+    }
+
+    .sheet-card-info p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Privacy Header Notice -->
+  <div class="privacy-banner">
+    <span>🔒 <strong>100% Client-Side Privacy:</strong> All file processing, GSTIN checks, and reconciliation happen exclusively in your browser. No financial data ever leaves your computer.</span>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">GST</div>
+        <div class="brand-text">
+          <h1>GST Reconciliation Portal <span class="brand-badge">Books vs GSTR-2B</span></h1>
+          <p>Automated input tax credit analysis, typo tolerance & action-driven reports</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="themeToggleBtn" class="theme-toggle" title="Toggle Theme">🌙</button>
+        <button id="resetAllBtn" class="btn btn-outline btn-sm">↺ Reset All</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Stepper -->
+  <div class="stepper-wrapper">
+    <div class="stepper">
+      <div class="step-item active" id="stepIndicator1" onclick="app.goToStep(1)">
+        <div class="step-num">1</div>
+        <div>
+          <div class="step-label">Upload Files</div>
+          <div class="step-desc">Books & GSTR-2B</div>
+        </div>
+      </div>
+      <div class="step-item" id="stepIndicator2" onclick="app.goToStep(2)">
+        <div class="step-num">2</div>
+        <div>
+          <div class="step-label">Map Columns</div>
+          <div class="step-desc">Auto-detected fields</div>
+        </div>
+      </div>
+      <div class="step-item" id="stepIndicator3" onclick="app.goToStep(3)">
+        <div class="step-num">3</div>
+        <div>
+          <div class="step-label">Reconciliation</div>
+          <div class="step-desc">Analysis & Summary</div>
+        </div>
+      </div>
+      <div class="step-item" id="stepIndicator4" onclick="app.goToStep(4)">
+        <div class="step-num">4</div>
+        <div>
+          <div class="step-label">Download Report</div>
+          <div class="step-desc">Multi-sheet Excel</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Views Container -->
+  <main>
+
+    <!-- STEP 1: Upload Files & Settings -->
+    <section id="stepView1" class="step-view active">
+      
+      <!-- Demo Data Quickstart Bar -->
+      <div class="demo-bar">
+        <div>
+          <strong>Need sample files to test immediately?</strong>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+            Populate realistic test invoices (matching, amount mismatch, invoice typo, missing in 2B, missing in books, duplicate & invalid GSTIN) with 1 click.
+          </p>
+        </div>
+        <button id="loadSampleDataBtn" class="btn btn-primary btn-sm">⚡ Load Demo Invoices</button>
+      </div>
+
+      <div class="upload-grid">
+        <!-- Purchase Register Box -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">📖 Purchase Register (Books)</div>
+              <div class="card-subtitle">Your accounting / ERP ledger records</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="drop-zone" id="dropZoneBooks">
+              <input type="file" id="fileInputBooks" class="file-input-hidden" accept=".xlsx, .xls, .csv">
+              <div class="drop-icon">📑</div>
+              <div class="drop-title">Drop Purchase Register Here</div>
+              <div class="drop-sub">Supports Excel (.xlsx, .xls) and CSV</div>
+              <button type="button" class="btn btn-outline btn-sm">Browse File</button>
+              <div id="booksFileInfo" style="display: none;">
+                <div class="file-pill">
+                  <span id="booksFileName">books.xlsx</span>
+                  <span id="booksRowCount" style="color: var(--primary);">(0 rows)</span>
+                  <span class="clear-btn" id="clearBooksBtn" title="Remove file">&times;</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview 5 rows -->
+            <div id="booksPreviewContainer" style="display: none;">
+              <h4 style="font-size: 0.8rem; font-weight: 700; margin-top: 1rem; color: var(--text-muted);">First 5 Rows Preview:</h4>
+              <div class="table-responsive">
+                <table class="data-table" id="booksPreviewTable"></table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GSTR-2B Box -->
+        <div class="card">
+          <div class="card-header">
+            <div>
+              <div class="card-title">🏛️ GSTR-2B (Govt Portal)</div>
+              <div class="card-subtitle">Downloaded auto-drafted ITC statement</div>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="drop-zone" id="dropZone2B">
+              <input type="file" id="fileInput2B" class="file-input-hidden" accept=".xlsx, .xls, .csv">
+              <div class="drop-icon">📥</div>
+              <div class="drop-title">Drop GSTR-2B File Here</div>
+              <div class="drop-sub">Supports Excel (.xlsx, .xls) and CSV</div>
+              <button type="button" class="btn btn-outline btn-sm">Browse File</button>
+              <div id="portalFileInfo" style="display: none;">
+                <div class="file-pill">
+                  <span id="portalFileName">gstr2b.xlsx</span>
+                  <span id="portalRowCount" style="color: var(--primary);">(0 rows)</span>
+                  <span class="clear-btn" id="clearPortalBtn" title="Remove file">&times;</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Preview 5 rows -->
+            <div id="portalPreviewContainer" style="display: none;">
+              <h4 style="font-size: 0.8rem; font-weight: 700; margin-top: 1rem; color: var(--text-muted);">First 5 Rows Preview:</h4>
+              <div class="table-responsive">
+                <table class="data-table" id="portalPreviewTable"></table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Panel -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">⚙️ Reconciliation Match Parameters</div>
+            <div class="card-subtitle">Matching Rule: Supplier GSTIN + Invoice Number + Invoice Date + Total Invoice Value</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="config-panel" style="margin-bottom: 0; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));">
+            <div class="form-group">
+              <label for="amountTolerance">Total Invoice Value Tolerance (₹)</label>
+              <input type="number" id="amountTolerance" class="input-control" value="1.00" step="0.5" min="0">
+              <div class="helper">Maximum allowed difference in Total Invoice Value for a match (Default: ₹1.00)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button id="btnProceedToMapping" class="btn btn-primary" disabled>Proceed to Column Mapping &rarr;</button>
+      </div>
+    </section>
+
+    <!-- STEP 2: Column Mapping -->
+    <section id="stepView2" class="step-view">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🗂️ Field & Column Mapping</div>
+            <div class="card-subtitle">Verify that the system identified your columns accurately. Adjust if necessary.</div>
+          </div>
+          <button id="reAutoMapBtn" class="btn btn-outline btn-sm">↺ Re-run Auto Detection</button>
+        </div>
+        <div class="card-body">
+          <!-- Mapping Conflict Warning Banner -->
+          <div id="mappingWarningBanner" class="mapping-warning-box" style="display: none;"></div>
+
+          <div class="mapping-grid">
+            
+            <!-- Books Column Mapping -->
+            <div>
+              <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--primary);">
+                📖 Purchase Register Columns
+              </h3>
+              <table class="mapping-table">
+                <thead>
+                  <tr>
+                    <th>Standard GST Field</th>
+                    <th>File Column</th>
+                  </tr>
+                </thead>
+                <tbody id="booksMappingBody">
+                  <!-- Generated dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- GSTR-2B Column Mapping -->
+            <div>
+              <h3 style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--info);">
+                🏛️ GSTR-2B Columns
+              </h3>
+              <table class="mapping-table">
+                <thead>
+                  <tr>
+                    <th>Standard GST Field</th>
+                    <th>File Column</th>
+                  </tr>
+                </thead>
+                <tbody id="portalMappingBody">
+                  <!-- Generated dynamically -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between;">
+        <button class="btn btn-outline" onclick="app.goToStep(1)">&larr; Back to Upload</button>
+        <button id="btnRunReconciliation" class="btn btn-primary">⚡ Run Fast Reconciliation &rarr;</button>
+      </div>
+    </section>
+
+    <!-- STEP 3: Reconciliation Dashboard -->
+    <section id="stepView3" class="step-view">
+      
+      <!-- Key KPI Cards -->
+      <div class="metrics-grid">
+        <div class="metric-card total">
+          <div class="metric-title">Total Invoices</div>
+          <div class="metric-value" id="kpiTotalInvoices">0</div>
+          <div class="metric-sub">Books: <strong id="kpiBooksCount">0</strong> | 2B: <strong id="kpi2BCount">0</strong></div>
+        </div>
+        <div class="metric-card matched">
+          <div class="metric-title">Fully Matched</div>
+          <div class="metric-value" id="kpiMatchedCount" style="color: var(--success);">0</div>
+          <div class="metric-sub">ITC: <strong id="kpiMatchedITC">₹0</strong></div>
+        </div>
+        <div class="metric-card partial">
+          <div class="metric-title">Partially Matched</div>
+          <div class="metric-value" id="kpiPartialCount" style="color: var(--warning);">0</div>
+          <div class="metric-sub">Amount Diff: <strong id="kpiPartialDiff">₹0</strong></div>
+        </div>
+        <div class="metric-card missing-2b">
+          <div class="metric-title">Missing in GSTR-2B (At Risk)</div>
+          <div class="metric-value" id="kpiMissing2BCount" style="color: var(--danger);">0</div>
+          <div class="metric-sub">ITC at Risk: <strong id="kpiAtRiskITC" style="color: var(--danger);">₹0</strong></div>
+        </div>
+        <div class="metric-card missing-books">
+          <div class="metric-title">Missing in Books</div>
+          <div class="metric-value" id="kpiMissingBooksCount" style="color: var(--info);">0</div>
+          <div class="metric-sub">Unclaimed ITC: <strong id="kpiUnclaimedITC">₹0</strong></div>
+        </div>
+      </div>
+
+      <!-- Charts Section (Plain Canvas, zero libraries) -->
+      <div class="charts-grid">
+        <div class="chart-box">
+          <h3>Reconciliation Status Breakdown</h3>
+          <div class="chart-canvas-container">
+            <canvas id="statusDonutChart" width="360" height="240"></canvas>
+          </div>
+        </div>
+        <div class="chart-box">
+          <h3>Input Tax Credit (ITC) Distribution (₹)</h3>
+          <div class="chart-canvas-container">
+            <canvas id="itcBarChart" width="440" height="240"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Match Diagnostics Panel -->
+      <div class="card" id="diagnosticsCard">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🔬 Match Diagnostics</div>
+            <div class="card-subtitle">Processed records, O(1) keys matched (GSTIN + normalized invoice number), and sample unmatched rows</div>
+          </div>
+        </div>
+        <div class="card-body" id="matchDiagnosticsPanel">
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">Reconciliation diagnostics will appear here once processed.</p>
+        </div>
+      </div>
+
+      <!-- Supplier-Wise Summary Table Card -->
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">🏢 Supplier-Wise ITC Summary & Risk</div>
+            <div class="card-subtitle">Click on any supplier row to filter detailed invoices below</div>
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-muted);" id="supplierCountLabel">0 Suppliers</div>
+        </div>
+        <div class="table-responsive" style="max-height: 280px; margin-top: 0; border: none; border-bottom: 1px solid var(--border);">
+          <table class="data-table" id="supplierSummaryTable">
+            <thead>
+              <tr>
+                <th>Supplier Name</th>
+                <th>GSTIN</th>
+                <th>Total Invoices</th>
+                <th>Matched</th>
+                <th>Mismatched</th>
+                <th>Missing in 2B</th>
+                <th>Books Tax (₹)</th>
+                <th>2B Tax (₹)</th>
+                <th>Tax Diff / Risk (₹)</th>
+                <th>Action Recommendation</th>
+              </tr>
+            </thead>
+            <tbody id="supplierSummaryBody">
+              <!-- Dynamically generated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Detailed Reconciliation Records Table -->
+      <div class="card">
+        <div class="card-header" style="border-bottom: none; padding-bottom: 0;">
+          <div class="card-title">📋 Detailed Invoices Comparison</div>
+          <div class="card-subtitle">Real-time search, multi-status filters, sorting & side-by-side inspection</div>
+        </div>
+
+        <div class="table-toolbar">
+          <!-- Status Tabs -->
+          <div class="filter-group">
+            <button class="tab-btn active" data-filter="all">All (<span id="tabCountAll">0</span>)</button>
+            <button class="tab-btn" data-filter="matched">Matched (<span id="tabCountMatched">0</span>)</button>
+            <button class="tab-btn" data-filter="partial">Partial / Mismatch (<span id="tabCountPartial">0</span>)</button>
+            <button class="tab-btn" data-filter="missing-2b">Missing in 2B (<span id="tabCountMissing2B">0</span>)</button>
+            <button class="tab-btn" data-filter="missing-books">Missing in Books (<span id="tabCountMissingBooks">0</span>)</button>
+            <button class="tab-btn" data-filter="duplicate">Duplicates (<span id="tabCountDuplicate">0</span>)</button>
+            <button class="tab-btn" data-filter="invalid">Invalid GSTIN (<span id="tabCountInvalid">0</span>)</button>
+          </div>
+
+          <!-- Search Box -->
+          <div class="search-box">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="recordSearchInput" class="search-input" placeholder="Search supplier, GSTIN, invoice #...">
+          </div>
+        </div>
+
+        <div class="table-responsive" style="margin-top: 0; max-height: 480px; border: none;">
+          <table class="data-table" id="reconciliationMasterTable">
+            <thead>
+              <tr>
+                <th onclick="app.sortTable('status')">Status <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('gstin')">GSTIN <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('supplierName')">Supplier Name <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('booksInv')">Books Inv # <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('portalInv')">2B Inv # <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('booksDate')">Books Date <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('portalDate')">2B Date <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('booksTaxable')">Books Taxable (₹) <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('portalTaxable')">2B Taxable (₹) <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('booksTax')">Books Tax (₹) <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('portalTax')">2B Tax (₹) <span class="sort-icon">⇅</span></th>
+                <th onclick="app.sortTable('taxDiff')">Tax Diff (₹) <span class="sort-icon">⇅</span></th>
+                <th>Remarks / Action</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="reconciliationTableBody">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination Controls -->
+        <div class="pagination-bar">
+          <div id="paginationInfo">Showing 0 to 0 of 0 records</div>
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div>
+              <label for="pageSizeSelect">Per page:</label>
+              <select id="pageSizeSelect" style="padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg-surface); color: var(--text-main);">
+                <option value="25">25</option>
+                <option value="50" selected>50</option>
+                <option value="100">100</option>
+                <option value="500">500</option>
+              </select>
+            </div>
+            <div class="pagination-controls">
+              <button id="btnPrevPage" class="btn btn-outline btn-sm">&larr; Prev</button>
+              <span id="currentPageLabel" style="font-weight: 700; padding: 0 0.5rem;">1 / 1</span>
+              <button id="btnNextPage" class="btn btn-outline btn-sm">Next &rarr;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; margin-top: 1.5rem;">
+        <button class="btn btn-outline" onclick="app.goToStep(2)">&larr; Back to Mapping</button>
+        <button class="btn btn-primary" onclick="app.goToStep(4)">Proceed to Download Report &rarr;</button>
+      </div>
+    </section>
+
+    <!-- STEP 4: Download Excel Report -->
+    <section id="stepView4" class="step-view">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">📥 Generate Comprehensive Excel Workbook</div>
+            <div class="card-subtitle">Export the full reconciliation results into a professionally formatted Excel spreadsheet (.xlsx)</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <p style="font-size: 0.9rem; color: var(--text-main); margin-bottom: 1rem;">
+            The exported Excel file will contain <strong>7 dedicated worksheets</strong> with frozen header panes, auto-fit column widths, formatted numeric amounts, and action items:
+          </p>
+
+          <div class="sheet-card-list">
+            <div class="sheet-card">
+              <div class="sheet-card-icon">1</div>
+              <div class="sheet-card-info">
+                <h4>Summary</h4>
+                <p>Key reconciliation metrics, ITC claimed vs available, and total financial risk breakdown.</p>
+              </div>
+            </div>
+            <div class="sheet-card">
+              <div class="sheet-card-icon">2</div>
+              <div class="sheet-card-info">
+                <h4>Reconciliation</h4>
+                <p>Master sheet with side-by-side comparison, differences, match status & action remarks.</p>
+              </div>
+            </div>
+            <div class="sheet-card">
+              <div class="sheet-card-icon">3</div>
+              <div class="sheet-card-info">
+                <h4>Matched</h4>
+                <p>100% verified records ready for immediate input tax credit claiming.</p>
+              </div>
+            </div>
+            <div class="sheet-card">
+              <div class="sheet-card-icon">4</div>
+              <div class="sheet-card-info">
+                <h4>Mismatched</h4>
+                <p>Records with tax or taxable value differences requiring amount adjustments.</p>
+              </div>
+            </div>
+            <div class="sheet-card">
+              <div class="sheet-card-icon">5</div>
+              <div class="sheet-card-info">
+                <h4>Missing in GSTR-2B</h4>
+                <p>Invoices in books but absent in 2B — actionable list to send to defaulting suppliers.</p>
+              </div>
+            </div>
+            <div class="sheet-card">
+              <div class="sheet-card-icon">6</div>
+              <div class="sheet-card-info">
+                <h4>Missing in Books</h4>
+                <p>Invoices reflected on portal but not booked in accounting — potential unclaimed ITC.</p>
+              </div>
+            </div>
+            <div class="sheet-card">
+              <div class="sheet-card-icon">7</div>
+              <div class="sheet-card-info">
+                <h4>Supplier Summary</h4>
+                <p>Consolidated vendor-level summary table with total invoices, matched count, and risk.</p>
+              </div>
+            </div>
+          </div>
+
+          <div style="background: var(--bg-surface-alt); padding: 1.25rem; border-radius: var(--radius-sm); border: 1px solid var(--border); margin: 1.5rem 0; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
+            <div>
+              <label for="exportFileName" style="font-size: 0.82rem; font-weight: 700; display: block; margin-bottom: 0.35rem;">File Name:</label>
+              <input type="text" id="exportFileName" class="input-control" value="GST_Reconciliation_Report.xlsx" style="min-width: 320px;">
+            </div>
+            <button id="btnDownloadExcel" class="btn btn-success" style="font-size: 1rem; padding: 0.75rem 1.75rem;">
+              📊 Download Analyzed Excel File (.xlsx)
+            </button>
+          </div>
+
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-start;">
+        <button class="btn btn-outline" onclick="app.goToStep(3)">&larr; Back to Dashboard</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Side-by-Side Detail Inspection Modal -->
+  <div class="modal-backdrop" id="detailModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Invoice Comparison Detail</div>
+        <button class="modal-close" onclick="app.closeModal()">&times;</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Injected dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading Overlay -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="spinner"></div>
+    <div class="loading-text" id="loadingText">Processing...</div>
+    <div class="loading-sub" id="loadingSub">This takes just a moment</div>
+  </div>
+
+  <script>
+    /**
+     * GST Reconciliation Tool - Single-File Web Application
+     * Author: DeepMind Antigravity
+     * Architecture: 100% Client-Side Vanilla JS + SheetJS
+     */
+
+    // --- Core Application State ---
+    const appState = {
+      theme: 'light',
+      currentStep: 1,
+      
+      // Raw parsed data
+      rawBooksData: null,
+      rawBooksHeaders: [],
+      rawPortalData: null,
+      rawPortalHeaders: [],
+
+      // File metadata
+      booksFileName: '',
+      booksRowCount: 0,
+      portalFileName: '',
+      portalRowCount: 0,
+
+      // Settings
+      amountTolerance: 1.0,
+
+      // Match Diagnostics
+      matchDiagnostics: null,
+
+      // Column Mappings
+      booksMapping: {},
+      portalMapping: {},
+
+      // Cleaned & Processed records
+      cleanedBooksRecords: [],
+      cleanedPortalRecords: [],
+
+      // Reconciliation Output
+      results: [],
+      supplierSummary: [],
+      metrics: {
+        totalBooks: 0,
+        totalPortal: 0,
+        matchedCount: 0,
+        matchedITC: 0,
+        partialCount: 0,
+        partialDiff: 0,
+        missing2BCount: 0,
+        atRiskITC: 0,
+        missingBooksCount: 0,
+        unclaimedITC: 0,
+        duplicateCount: 0,
+        invalidCount: 0
+      },
+
+      // Table View state
+      activeFilter: 'all',
+      searchQuery: '',
+      supplierFilter: null,
+      sortColumn: 'taxDiff',
+      sortOrder: 'desc',
+      currentPage: 1,
+      pageSize: 50
+    };
+
+    // Standard required fields for GST Reconciliation
+    const STANDARD_FIELDS = [
+      { key: 'gstin', label: 'Supplier GSTIN', required: true, synonyms: ['gstin', 'supplier gstin', 'gstin of supplier', 'vendor gstin', 'party gstin', 'gstin/uin', 'gstin / uin', 'gstin uin', 'gst_no', 'gst no', 'gstin_no', 'gst number', 'gstin number'] },
+      { key: 'supplierName', label: 'Supplier Name', required: false, synonyms: ['trade/legal name', 'trade / legal name', 'trade/legal', 'trade / legal', 'party name', 'supplier name', 'legal name', 'trade name', 'vendor name', 'customer name', 'name of supplier', 'supplier', 'party', 'vendor'] },
+      { key: 'invoiceNumber', label: 'Invoice Number', required: true, synonyms: ['invoice no', 'invoice number', 'inv no', 'inv number', 'invoice #', 'bill no', 'doc no', 'document no', 'document number', 'ref no'] },
+      { key: 'invoiceDate', label: 'Invoice Date', required: true, synonyms: ['invoice date', 'inv date', 'date', 'bill date', 'doc date', 'document date'] },
+      { key: 'taxableValue', label: 'Taxable Value', required: true, synonyms: ['basic amt', 'basic amount', 'taxable value', 'basic value', 'taxable amount', 'taxable amt', 'taxable val', 'taxable', 'assessable value', 'base amount', 'taxable_value'] },
+      { key: 'cgst', label: 'CGST Amount', required: false, synonyms: ['central tax', 'central tax amount', 'central tax amt', 'cgst', 'cgst amount', 'cgst amt', 'cgst_amount', 'central gst'] },
+      { key: 'sgst', label: 'SGST / UTGST Amount', required: false, synonyms: ['state/ut tax', 'state / ut tax', 'state ut tax', 'state/ut', 'state tax', 'state tax amount', 'sgst', 'sgst amount', 'sgst amt', 'sgst_amount', 'utgst', 'sgst/utgst', 'ut tax', 'state gst'] },
+      { key: 'igst', label: 'IGST Amount', required: false, synonyms: ['integrated tax', 'integrated tax amount', 'integrated tax amt', 'igst', 'igst amount', 'igst amt', 'igst_amount', 'integrated gst'] },
+      { key: 'cess', label: 'Cess Amount', required: false, synonyms: ['cess', 'cess amount', 'cess amt', 'gst cess', 'compensation cess'] },
+      { key: 'invoiceValue', label: 'Total Invoice Value', required: false, synonyms: ['invoice value', 'total invoice value', 'invoice amount', 'total amount', 'inv value', 'inv amount', 'gross amount', 'grand total'] },
+      { key: 'totalTax', label: 'Total Tax', required: false, synonyms: ['total tax', 'total tax amount', 'total tax amt'] }
+    ];
+
+    // Standard 15-character GSTIN regex: 2 digits + 5 letters + 4 digits + 1 letter + 1 alphanum + 'Z' + 1 alphanum
+    const GSTIN_REGEX = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+
+    // Main App Controller
+    const app = {
+      init() {
+        this.bindEvents();
+        this.initTheme();
+      },
+
+      initTheme() {
+        const savedTheme = localStorage.getItem('gst_recon_theme') || 'light';
+        appState.theme = savedTheme;
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.getElementById('themeToggleBtn').textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+      },
+
+      toggleTheme() {
+        const newTheme = appState.theme === 'light' ? 'dark' : 'light';
+        appState.theme = newTheme;
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('gst_recon_theme', newTheme);
+        document.getElementById('themeToggleBtn').textContent = newTheme === 'dark' ? '☀️' : '🌙';
+        
+        // Re-render canvas charts for proper theme palette
+        if (appState.results.length > 0) {
+          app.renderCharts();
+        }
+      },
+
+      bindEvents() {
+        // Theme toggle
+        document.getElementById('themeToggleBtn').addEventListener('click', () => this.toggleTheme());
+
+        // Reset
+        document.getElementById('resetAllBtn').addEventListener('click', () => {
+          if (confirm('Are you sure you want to reset all data and start over?')) {
+            location.reload();
+          }
+        });
+
+        // Demo Data loader
+        document.getElementById('loadSampleDataBtn').addEventListener('click', () => this.loadSampleData());
+
+        // File Drag & Drop for Books
+        this.setupDropZone('dropZoneBooks', 'fileInputBooks', (file) => this.handleFile(file, 'books'));
+        document.getElementById('clearBooksBtn').addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          this.clearFile('books');
+        });
+
+        // File Drag & Drop for Portal (2B)
+        this.setupDropZone('dropZone2B', 'fileInput2B', (file) => this.handleFile(file, 'portal'));
+        document.getElementById('clearPortalBtn').addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          this.clearFile('portal');
+        });
+
+        // Stepper Navigation
+        document.getElementById('btnProceedToMapping').addEventListener('click', () => this.goToStep(2));
+        document.getElementById('reAutoMapBtn').addEventListener('click', () => this.runAutoMapping());
+        document.getElementById('btnRunReconciliation').addEventListener('click', () => this.startReconciliation());
+
+        // Search & Filter
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+            appState.activeFilter = e.currentTarget.dataset.filter;
+            appState.currentPage = 1;
+            this.renderReconciliationTable();
+          });
+        });
+
+        const searchInput = document.getElementById('recordSearchInput');
+        searchInput.addEventListener('input', (e) => {
+          appState.searchQuery = e.target.value.trim().toLowerCase();
+          appState.currentPage = 1;
+          this.renderReconciliationTable();
+        });
+
+        // Pagination
+        document.getElementById('btnPrevPage').addEventListener('click', () => {
+          if (appState.currentPage > 1) {
+            appState.currentPage--;
+            this.renderReconciliationTable();
+          }
+        });
+
+        document.getElementById('btnNextPage').addEventListener('click', () => {
+          const totalPages = Math.ceil(this.getFilteredRecords().length / appState.pageSize) || 1;
+          if (appState.currentPage < totalPages) {
+            appState.currentPage++;
+            this.renderReconciliationTable();
+          }
+        });
+
+        document.getElementById('pageSizeSelect').addEventListener('change', (e) => {
+          appState.pageSize = parseInt(e.target.value, 10);
+          appState.currentPage = 1;
+          this.renderReconciliationTable();
+        });
+
+        // Download Excel
+        document.getElementById('btnDownloadExcel').addEventListener('click', () => this.exportExcel());
+      },
+
+      setupDropZone(zoneId, inputId, onFileSelected) {
+        const zone = document.getElementById(zoneId);
+        const input = document.getElementById(inputId);
+
+        zone.addEventListener('click', (e) => {
+          if (e.target.closest('.clear-btn') || e.target.closest('.file-pill')) {
+            return;
+          }
+          input.click();
+        });
+
+        ['dragenter', 'dragover'].forEach(name => {
+          zone.addEventListener(name, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            zone.classList.add('dragover');
+          });
+        });
+
+        ['dragleave', 'drop'].forEach(name => {
+          zone.addEventListener(name, (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            zone.classList.remove('dragover');
+          });
+        });
+
+        zone.addEventListener('drop', (e) => {
+          if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            onFileSelected(e.dataTransfer.files[0]);
+          }
+        });
+
+        input.addEventListener('change', (e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            onFileSelected(e.target.files[0]);
+          }
+        });
+      },
+
+      showLoading(title, subtitle) {
+        document.getElementById('loadingText').textContent = title || 'Processing...';
+        document.getElementById('loadingSub').textContent = subtitle || 'Please wait';
+        document.getElementById('loadingOverlay').classList.add('active');
+      },
+
+      hideLoading() {
+        document.getElementById('loadingOverlay').classList.remove('active');
+      },
+
+      goToStep(stepNumber) {
+        if (stepNumber === 2 && (!appState.rawBooksData || !appState.rawPortalData)) {
+          alert('Please upload or load sample data for both Purchase Register and GSTR-2B before proceeding.');
+          return;
+        }
+
+        if (stepNumber >= 3 && appState.results.length === 0) {
+          alert('Please complete the column mapping and run reconciliation first.');
+          return;
+        }
+
+        appState.currentStep = stepNumber;
+
+        // Update Stepper UI
+        for (let i = 1; i <= 4; i++) {
+          const indicator = document.getElementById(`stepIndicator${i}`);
+          const view = document.getElementById(`stepView${i}`);
+          
+          indicator.classList.remove('active', 'completed');
+          view.classList.remove('active');
+
+          if (i === stepNumber) {
+            indicator.classList.add('active');
+            view.classList.add('active');
+          } else if (i < stepNumber) {
+            indicator.classList.add('completed');
+          }
+        }
+
+        if (stepNumber === 2) {
+          this.renderColumnMappingUI();
+        } else if (stepNumber === 3) {
+          this.renderDashboard();
+        }
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      },
+
+      handleFile(file, type) {
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['xlsx', 'xls', 'csv'].includes(ext)) {
+          alert(`Unsupported file format (.${ext}). Please upload an Excel (.xlsx, .xls) or CSV file.`);
+          return;
+        }
+
+        this.showLoading(`Reading ${file.name}...`, 'Parsing rows and headers');
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+
+            // Convert to 2D array: headers in first non-empty row
+            const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+
+            if (!rawRows || rawRows.length < 2) {
+              throw new Error('File appears to be empty or missing header columns.');
+            }
+
+            // Find header row (first row with at least 3 non-empty values)
+            let headerIndex = 0;
+            for (let i = 0; i < Math.min(rawRows.length, 10); i++) {
+              const nonEmpties = rawRows[i].filter(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+              if (nonEmpties.length >= 3) {
+                headerIndex = i;
+                break;
+              }
+            }
+
+            const rawHeaders = rawRows[headerIndex].map(h => String(h || '').trim());
+            const dataRows = [];
+
+            for (let i = headerIndex + 1; i < rawRows.length; i++) {
+              const row = rawRows[i];
+              // Skip empty rows
+              if (!row || row.every(cell => cell === null || cell === undefined || String(cell).trim() === '')) {
+                continue;
+              }
+              const rowObj = {};
+              rawHeaders.forEach((h, colIdx) => {
+                rowObj[h] = row[colIdx] !== undefined ? row[colIdx] : '';
+              });
+              dataRows.push(rowObj);
+            }
+
+            if (type === 'books') {
+              appState.rawBooksData = dataRows;
+              appState.rawBooksHeaders = rawHeaders;
+              appState.booksFileName = file.name;
+              appState.booksRowCount = dataRows.length;
+
+              document.getElementById('booksFileName').textContent = file.name;
+              document.getElementById('booksRowCount').textContent = `(${dataRows.length.toLocaleString('en-IN')} rows)`;
+              document.getElementById('booksFileInfo').style.display = 'block';
+
+              this.renderPreviewTable('booksPreviewTable', rawHeaders, dataRows.slice(0, 5));
+              document.getElementById('booksPreviewContainer').style.display = 'block';
+            } else {
+              appState.rawPortalData = dataRows;
+              appState.rawPortalHeaders = rawHeaders;
+              appState.portalFileName = file.name;
+              appState.portalRowCount = dataRows.length;
+
+              document.getElementById('portalFileName').textContent = file.name;
+              document.getElementById('portalRowCount').textContent = `(${dataRows.length.toLocaleString('en-IN')} rows)`;
+              document.getElementById('portalFileInfo').style.display = 'block';
+
+              this.renderPreviewTable('portalPreviewTable', rawHeaders, dataRows.slice(0, 5));
+              document.getElementById('portalPreviewContainer').style.display = 'block';
+            }
+
+            this.checkReadyToProceed();
+          } catch (err) {
+            console.error(err);
+            alert(`Error reading file: ${err.message}`);
+          } finally {
+            this.hideLoading();
+          }
+        };
+
+        reader.readAsArrayBuffer(file);
+      },
+
+      clearFile(type) {
+        if (type === 'books') {
+          appState.rawBooksData = null;
+          appState.rawBooksHeaders = [];
+          appState.booksFileName = '';
+          appState.booksRowCount = 0;
+          appState.cleanedBooksRecords = [];
+          const input = document.getElementById('fileInputBooks');
+          if (input) input.value = '';
+          const info = document.getElementById('booksFileInfo');
+          if (info) info.style.display = 'none';
+          const prev = document.getElementById('booksPreviewContainer');
+          if (prev) {
+            prev.style.display = 'none';
+            const table = document.getElementById('booksPreviewTable');
+            if (table) table.innerHTML = '';
+          }
+        } else {
+          appState.rawPortalData = null;
+          appState.rawPortalHeaders = [];
+          appState.portalFileName = '';
+          appState.portalRowCount = 0;
+          appState.cleanedPortalRecords = [];
+          const input = document.getElementById('fileInput2B');
+          if (input) input.value = '';
+          const info = document.getElementById('portalFileInfo');
+          if (info) info.style.display = 'none';
+          const prev = document.getElementById('portalPreviewContainer');
+          if (prev) {
+            prev.style.display = 'none';
+            const table = document.getElementById('portalPreviewTable');
+            if (table) table.innerHTML = '';
+          }
+        }
+        appState.results = [];
+        this.checkReadyToProceed();
+      },
+
+      checkReadyToProceed() {
+        const canProceed = Boolean(appState.rawBooksData && appState.rawPortalData);
+        document.getElementById('btnProceedToMapping').disabled = !canProceed;
+      },
+
+      renderPreviewTable(tableId, headers, rows) {
+        const table = document.getElementById(tableId);
+        let thead = '<thead><tr>';
+        headers.forEach(h => {
+          thead += `<th>${this.escapeHtml(h)}</th>`;
+        });
+        thead += '</tr></thead>';
+
+        let tbody = '<tbody>';
+        rows.forEach(r => {
+          tbody += '<tr>';
+          headers.forEach(h => {
+            let val = r[h];
+            if (val instanceof Date) {
+              val = val.toLocaleDateString('en-IN');
+            }
+            tbody += `<td>${this.escapeHtml(String(val !== undefined && val !== null ? val : ''))}</td>`;
+          });
+          tbody += '</tr>';
+        });
+        tbody += '</tbody>';
+
+        table.innerHTML = thead + tbody;
+      },
+
+      // --- Auto Column Mapping ---
+      runAutoMapping() {
+        appState.booksMapping = this.autoDetectMapping(appState.rawBooksHeaders);
+        appState.portalMapping = this.autoDetectMapping(appState.rawPortalHeaders);
+        this.renderColumnMappingUI();
+      },
+
+      autoDetectMapping(headers) {
+        const mapping = {};
+        const usedColumns = new Set();
+        const cleanStr = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const lowerHeaders = headers.map(h => ({
+          original: h,
+          clean: cleanStr(h),
+          rawLower: String(h || '').toLowerCase()
+        }));
+
+        for (const field of STANDARD_FIELDS) {
+          let matchedHeader = '';
+
+          // Rule 4: Total Tax must NEVER be auto-mapped to a Taxable Value or Invoice Value column.
+          // Leave it unmapped unless the header contains "Total Tax".
+          if (field.key === 'totalTax') {
+            const match = lowerHeaders.find(h =>
+              !usedColumns.has(h.original) &&
+              (h.rawLower.includes('total tax') || h.clean.includes('totaltax'))
+            );
+            if (match) {
+              matchedHeader = match.original;
+            }
+          } else {
+            // Pass 1: Exact match on clean string
+            for (const syn of field.synonyms) {
+              const cleanSyn = cleanStr(syn);
+              const match = lowerHeaders.find(h => {
+                if (usedColumns.has(h.original)) return false;
+                // Rule 1: "Trade/Legal name", "Party Name", "Supplier Name" -> Supplier Name (never GSTIN).
+                // If header contains 'name' without 'gstin', never let GSTIN match it!
+                if (field.key === 'gstin' && h.rawLower.includes('name') && !h.rawLower.includes('gstin')) {
+                  return false;
+                }
+                return h.clean === cleanSyn;
+              });
+              if (match) {
+                matchedHeader = match.original;
+                break;
+              }
+            }
+
+            // Pass 2: Substring / Containment match
+            if (!matchedHeader) {
+              for (const syn of field.synonyms) {
+                const cleanSyn = cleanStr(syn);
+                if (cleanSyn.length < 3) continue;
+                const match = lowerHeaders.find(h => {
+                  if (usedColumns.has(h.original)) return false;
+                  // Rule 1: Never GSTIN for headers containing 'name'
+                  if (field.key === 'gstin' && h.rawLower.includes('name') && !h.rawLower.includes('gstin')) {
+                    return false;
+                  }
+                  // Rule 4: Taxable Value must not steal invoice / total amount
+                  if (field.key === 'taxableValue' && (h.rawLower.includes('invoice') || h.rawLower.includes('total amount'))) {
+                    return false;
+                  }
+                  return h.clean.includes(cleanSyn) || cleanSyn.includes(h.clean);
+                });
+                if (match) {
+                  matchedHeader = match.original;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (matchedHeader) {
+            mapping[field.key] = matchedHeader;
+            // Rule 5: Never let two different standard fields use the same file column
+            usedColumns.add(matchedHeader);
+          } else {
+            mapping[field.key] = '';
+          }
+        }
+
+        return mapping;
+      },
+
+      checkMappingConflicts() {
+        const checkSide = (mapping, headers, typeName) => {
+          const colCount = {};
+          for (const key of Object.keys(mapping)) {
+            const col = mapping[key];
+            if (col && String(col).trim() !== '') {
+              if (!colCount[col]) colCount[col] = [];
+              const fld = STANDARD_FIELDS.find(f => f.key === key);
+              colCount[col].push(fld ? fld.label : key);
+            }
+          }
+          const conflicts = [];
+          for (const col of Object.keys(colCount)) {
+            if (colCount[col].length > 1) {
+              conflicts.push(`Column "<strong>${app.escapeHtml(col)}</strong>" in ${typeName} is mapped to multiple fields: <em>${colCount[col].join(', ')}</em>.`);
+            }
+          }
+          return conflicts;
+        };
+
+        const booksConflicts = checkSide(appState.booksMapping, appState.rawBooksHeaders, 'Purchase Register');
+        const portalConflicts = checkSide(appState.portalMapping, appState.rawPortalHeaders, 'GSTR-2B');
+        const allConflicts = [...booksConflicts, ...portalConflicts];
+
+        const banner = document.getElementById('mappingWarningBanner');
+        if (banner) {
+          if (allConflicts.length > 0) {
+            banner.innerHTML = `⚠️ <strong>Mapping Conflict Warning:</strong><br>${allConflicts.join('<br>')}<div style="margin-top: 5px; font-weight: normal; font-size: 0.8rem;">Please ensure each standard field is mapped to a distinct file column unless intentionally shared.</div>`;
+            banner.style.display = 'block';
+          } else {
+            banner.style.display = 'none';
+            banner.innerHTML = '';
+          }
+        }
+
+        // Highlight conflicting select dropdowns
+        document.querySelectorAll('select[data-type]').forEach(sel => {
+          const type = sel.dataset.type;
+          const key = sel.dataset.key;
+          const val = sel.value;
+          const mapping = type === 'books' ? appState.booksMapping : appState.portalMapping;
+
+          let isConflicted = false;
+          if (val && String(val).trim() !== '') {
+            for (const otherKey of Object.keys(mapping)) {
+              if (otherKey !== key && mapping[otherKey] === val) {
+                isConflicted = true;
+                break;
+              }
+            }
+          }
+          if (isConflicted) {
+            sel.classList.add('select-conflict');
+          } else {
+            sel.classList.remove('select-conflict');
+          }
+        });
+
+        return allConflicts;
+      },
+
+      renderColumnMappingUI() {
+        if (!appState.booksMapping || Object.keys(appState.booksMapping).length === 0) {
+          appState.booksMapping = this.autoDetectMapping(appState.rawBooksHeaders);
+        }
+        if (!appState.portalMapping || Object.keys(appState.portalMapping).length === 0) {
+          appState.portalMapping = this.autoDetectMapping(appState.rawPortalHeaders);
+        }
+
+        const renderTableRows = (mappingBodyId, headers, mapping, type) => {
+          const body = document.getElementById(mappingBodyId);
+          let html = '';
+
+          STANDARD_FIELDS.forEach(field => {
+            const currentSelected = mapping[field.key] || '';
+            const isAuto = Boolean(currentSelected);
+
+            let options = `<option value="">-- Not Mapped --</option>`;
+            headers.forEach(h => {
+              const selectedAttr = h === currentSelected ? 'selected' : '';
+              options += `<option value="${this.escapeHtml(h)}" ${selectedAttr}>${this.escapeHtml(h)}</option>`;
+            });
+
+            html += `
+              <tr>
+                <td>
+                  <strong>${field.label}</strong>
+                  ${field.required ? '<span class="req-star">*</span>' : ''}
+                  ${isAuto ? '<span class="auto-badge">Auto</span>' : ''}
+                </td>
+                <td>
+                  <select class="input-control" data-type="${type}" data-key="${field.key}" onchange="app.onMappingChange(this)">
+                    ${options}
+                  </select>
+                </td>
+              </tr>
+            `;
+          });
+
+          body.innerHTML = html;
+        };
+
+        renderTableRows('booksMappingBody', appState.rawBooksHeaders, appState.booksMapping, 'books');
+        renderTableRows('portalMappingBody', appState.rawPortalHeaders, appState.portalMapping, 'portal');
+
+        this.checkMappingConflicts();
+      },
+
+      onMappingChange(selectEl) {
+        const type = selectEl.dataset.type;
+        const key = selectEl.dataset.key;
+        const val = selectEl.value;
+
+        if (type === 'books') {
+          appState.booksMapping[key] = val;
+        } else {
+          appState.portalMapping[key] = val;
+        }
+
+        this.checkMappingConflicts();
+      },
+
+      // --- Data Cleaning & Normalization ---
+      cleanAndNormalizeRecords(rawRows, mapping, sourceName) {
+        const cleaned = [];
+
+        for (let i = 0; i < rawRows.length; i++) {
+          const r = rawRows[i];
+
+          // GSTIN
+          const rawGSTIN = mapping.gstin ? String(r[mapping.gstin] || '').trim() : '';
+          const gstin = rawGSTIN.toUpperCase().replace(/\s+/g, '');
+          const isGSTINValid = GSTIN_REGEX.test(gstin);
+
+          // Supplier Name
+          const supplierName = mapping.supplierName ? String(r[mapping.supplierName] || '').trim() : (gstin || 'Unknown Supplier');
+
+          // Invoice Number
+          const rawInvNo = mapping.invoiceNumber ? String(r[mapping.invoiceNumber] || '').trim() : '';
+          const invoiceNumber = rawInvNo.toUpperCase();
+          const normalizedInvNo = this.normalizeInvoiceNumber(invoiceNumber);
+
+          // Invoice Date
+          const rawDate = mapping.invoiceDate ? r[mapping.invoiceDate] : '';
+          const { formattedDate, timestamp } = this.parseDate(rawDate);
+
+          // Amounts
+          const taxableValue = this.parseAmount(mapping.taxableValue ? r[mapping.taxableValue] : 0);
+          let cgst = this.parseAmount(mapping.cgst ? r[mapping.cgst] : 0);
+          let sgst = this.parseAmount(mapping.sgst ? r[mapping.sgst] : 0);
+          let igst = this.parseAmount(mapping.igst ? r[mapping.igst] : 0);
+          let cess = this.parseAmount(mapping.cess ? r[mapping.cess] : 0);
+
+          // Total Tax: if unmapped or 0, calculate as CGST + SGST + IGST + Cess
+          let totalTax = 0;
+          if (mapping.totalTax && r[mapping.totalTax] !== undefined && r[mapping.totalTax] !== null && String(r[mapping.totalTax]).trim() !== '') {
+            totalTax = this.parseAmount(r[mapping.totalTax]);
+          }
+          if (!mapping.totalTax || totalTax === 0) {
+            totalTax = cgst + sgst + igst + cess;
+          }
+
+          let invoiceValue = mapping.invoiceValue ? this.parseAmount(r[mapping.invoiceValue]) : (taxableValue + totalTax);
+          if (invoiceValue === 0 && taxableValue > 0) {
+            invoiceValue = taxableValue + totalTax;
+          }
+
+          cleaned.push({
+            id: `${sourceName}_${i + 1}`,
+            source: sourceName,
+            originalRow: r,
+            gstin,
+            rawGSTIN,
+            isGSTINValid,
+            supplierName: supplierName || 'Unknown Supplier',
+            invoiceNumber,
+            normalizedInvNo,
+            invoiceDate: formattedDate,
+            dateTimestamp: timestamp,
+            taxableValue,
+            cgst,
+            sgst,
+            igst,
+            cess: Math.round(cess * 100) / 100,
+            totalTax: Math.round(totalTax * 100) / 100,
+            invoiceValue: Math.round(invoiceValue * 100) / 100,
+            isDuplicate: false,
+            matchedRecord: null,
+            reconStatus: null,
+            matchType: null,
+            remarks: ''
+          });
+        }
+
+        // Duplicate Detection within file: same GSTIN + same normalized invoice number occurring > 1 time
+        const invMap = new Map();
+        cleaned.forEach(rec => {
+          if (!rec.normalizedInvNo || !rec.gstin) return;
+          const key = `${rec.gstin}_${rec.normalizedInvNo}`;
+          if (invMap.has(key)) {
+            invMap.get(key).push(rec);
+          } else {
+            invMap.set(key, [rec]);
+          }
+        });
+
+        invMap.forEach((duplicates) => {
+          if (duplicates.length > 1) {
+            duplicates.forEach(d => {
+              d.isDuplicate = true;
+            });
+          }
+        });
+
+        return cleaned;
+      },
+
+      normalizeInvoiceNumber(invNo) {
+        if (!invNo) return '';
+        let str = String(invNo).trim().toUpperCase();
+        // Split on spaces, slashes, hyphens, dots and other special characters
+        const segments = str.split(/[^A-Z0-9]+/);
+        // Remove leading zeros from each segment (e.g. '0045' -> '45')
+        let cleaned = segments.filter(Boolean).map(seg => seg.replace(/^0+(?!$)/, '')).join('');
+        // Also strip leading zeros between prefix letters and numbers (e.g. ABC0045 -> ABC45)
+        cleaned = cleaned.replace(/([A-Z])0+([1-9])/g, '$1$2');
+        // Strip any overall leading zeros
+        cleaned = cleaned.replace(/^0+(?!$)/, '');
+        return cleaned;
+      },
+
+      parseDate(val) {
+        if (!val) return { formattedDate: '', timestamp: 0 };
+
+        // 1. If it's already a Date object (from SheetJS cellDates: true)
+        if (val instanceof Date && !isNaN(val.getTime())) {
+          return {
+            formattedDate: this.formatISODate(val),
+            timestamp: val.getTime()
+          };
+        }
+
+        // 2. If it's an Excel serial date number (e.g. 44927)
+        if (typeof val === 'number') {
+          // Excel base date: 1899-12-30
+          const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+          const dateObj = new Date(excelEpoch.getTime() + val * 86400000);
+          return {
+            formattedDate: this.formatISODate(dateObj),
+            timestamp: dateObj.getTime()
+          };
+        }
+
+        const str = String(val).trim();
+
+        // 3. DD/MM/YYYY or DD-MM-YYYY
+        const dmyMatch = str.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+        if (dmyMatch) {
+          const day = parseInt(dmyMatch[1], 10);
+          const month = parseInt(dmyMatch[2], 10) - 1;
+          const year = parseInt(dmyMatch[3], 10);
+          const d = new Date(year, month, day);
+          return {
+            formattedDate: this.formatISODate(d),
+            timestamp: d.getTime()
+          };
+        }
+
+        // 4. YYYY-MM-DD or YYYY/MM/DD
+        const ymdMatch = str.match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})/);
+        if (ymdMatch) {
+          const year = parseInt(ymdMatch[1], 10);
+          const month = parseInt(ymdMatch[2], 10) - 1;
+          const day = parseInt(ymdMatch[3], 10);
+          const d = new Date(year, month, day);
+          return {
+            formattedDate: this.formatISODate(d),
+            timestamp: d.getTime()
+          };
+        }
+
+        // Fallback Date parse
+        const parsed = new Date(str);
+        if (!isNaN(parsed.getTime())) {
+          return {
+            formattedDate: this.formatISODate(parsed),
+            timestamp: parsed.getTime()
+          };
+        }
+
+        return { formattedDate: str, timestamp: 0 };
+      },
+
+      formatISODate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      },
+
+      parseAmount(val) {
+        if (val === null || val === undefined || val === '') return 0;
+        if (typeof val === 'number') return isNaN(val) ? 0 : val;
+        // Strip out rupee symbol, commas, and whitespace
+        const clean = String(val).replace(/[₹,\s]/g, '').trim();
+        const num = parseFloat(clean);
+        return isNaN(num) ? 0 : num;
+      },
+
+      // Levenshtein distance for fuzzy matching
+      levenshtein(a, b) {
+        const matrix = [];
+        for (let i = 0; i <= b.length; i++) {
+          matrix[i] = [i];
+        }
+        for (let j = 0; j <= a.length; j++) {
+          matrix[0][j] = j;
+        }
+        for (let i = 1; i <= b.length; i++) {
+          for (let j = 1; j <= a.length; j++) {
+            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+              matrix[i][j] = matrix[i - 1][j - 1];
+            } else {
+              matrix[i][j] = Math.min(
+                matrix[i - 1][j - 1] + 1, // substitution
+                matrix[i][j - 1] + 1,     // insertion
+                matrix[i - 1][j] + 1      // deletion
+              );
+            }
+          }
+        }
+        return matrix[b.length][a.length];
+      },
+
+      isFuzzyMatch(invA, invB) {
+        if (!invA || !invB) return false;
+        if (invA === invB) return true;
+        const maxLen = Math.max(invA.length, invB.length);
+        if (maxLen < 3) return false;
+        const dist = this.levenshtein(invA, invB);
+        // Distance <= 2 or similarity >= 75%
+        return dist <= 2 || ((maxLen - dist) / maxLen) >= 0.75;
+      },
+
+      // --- High-Performance Reconciliation Algorithm ---
+      startReconciliation() {
+        // Validate required mappings
+        if (!appState.booksMapping.gstin || !appState.booksMapping.invoiceNumber) {
+          alert('Please map GSTIN and Invoice Number for Purchase Register.');
+          return;
+        }
+        if (!appState.portalMapping.gstin || !appState.portalMapping.invoiceNumber) {
+          alert('Please map GSTIN and Invoice Number for GSTR-2B.');
+          return;
+        }
+
+        // Pull settings
+        const amtInput = document.getElementById('amountTolerance');
+        appState.amountTolerance = amtInput ? (parseFloat(amtInput.value) || 1.0) : 1.0;
+
+        this.showLoading('Running Reconciliation...', 'Building O(1) match index on GSTIN + Invoice Number...');
+
+        setTimeout(() => {
+          this.executeReconciliation();
+          this.hideLoading();
+          this.goToStep(3);
+        }, 60);
+      },
+
+      executeReconciliation() {
+        const books = this.cleanAndNormalizeRecords(appState.rawBooksData, appState.booksMapping, 'Books');
+        const portal = this.cleanAndNormalizeRecords(appState.rawPortalData, appState.portalMapping, 'GSTR-2B');
+
+        appState.cleanedBooksRecords = books;
+        appState.cleanedPortalRecords = portal;
+
+        const tolerance = appState.amountTolerance;
+
+        // Calendar date comparator (ignoring time)
+        const compareCalendarDates = (d1, d2, ts1, ts2) => {
+          if (d1 && d2 && d1 === d2) return true;
+          if (ts1 && ts2) {
+            const date1 = new Date(ts1);
+            const date2 = new Date(ts2);
+            return (
+              date1.getFullYear() === date2.getFullYear() &&
+              date1.getMonth() === date2.getMonth() &&
+              date1.getDate() === date2.getDate()
+            );
+          }
+          if (!d1 && !d2) return true;
+          return false;
+        };
+
+        const round2 = (val) => Math.round((Number(val) || 0) * 100) / 100;
+
+        // Build O(1) Maps keyed by GSTIN + '|' + normalizedInvNo
+        const portalMap = new Map();
+        portal.forEach(p => {
+          if (!p.gstin || !p.normalizedInvNo) return;
+          const key = p.gstin + '|' + p.normalizedInvNo;
+          if (!portalMap.has(key)) portalMap.set(key, []);
+          portalMap.get(key).push(p);
+        });
+
+        const booksMap = new Map();
+        books.forEach(b => {
+          if (!b.gstin || !b.normalizedInvNo) return;
+          const key = b.gstin + '|' + b.normalizedInvNo;
+          if (!booksMap.has(key)) booksMap.set(key, []);
+          booksMap.get(key).push(b);
+        });
+
+        // Debugging aid: Log normalized keys to the console
+        console.log('[GST Recon] Books sample normalized keys (up to 10):', Array.from(booksMap.keys()).slice(0, 10));
+        console.log('[GST Recon] GSTR-2B sample normalized keys (up to 10):', Array.from(portalMap.keys()).slice(0, 10));
+
+        const matchedPortalIds = new Set();
+        const matchedBooksIds = new Set();
+        const reconList = [];
+
+        // Track usage count per key for one-to-one matching
+        const portalKeyUsage = new Map();
+
+        // --- MATCHING PASS: Match Books records to GSTR-2B by GSTIN + normalizedInvNo ---
+        books.forEach(b => {
+          if (!b.gstin || !b.normalizedInvNo) return;
+          const key = b.gstin + '|' + b.normalizedInvNo;
+          if (!portalMap.has(key)) return;
+
+          const candidates = portalMap.get(key);
+          const usedCount = portalKeyUsage.get(key) || 0;
+          if (usedCount >= candidates.length) return; // All candidates for this key already matched (extras are duplicates)
+
+          const p = candidates[usedCount];
+          portalKeyUsage.set(key, usedCount + 1);
+
+          matchedPortalIds.add(p.id);
+          matchedBooksIds.add(b.id);
+          b.matchedRecord = p;
+          p.matchedRecord = b;
+
+          // Compare Date (calendar date only)
+          const dateMatch = compareCalendarDates(b.invoiceDate, p.invoiceDate, b.dateTimestamp, p.dateTimestamp);
+
+          // Compare Total Invoice Value (difference <= tolerance)
+          const bVal = round2(b.invoiceValue);
+          const pVal = round2(p.invoiceValue);
+          const valDiff = round2(Math.abs(bVal - pVal));
+          const valMatch = valDiff <= tolerance;
+
+          if (dateMatch && valMatch) {
+            b.reconStatus = 'matched';
+            b.matchType = 'Matched (GSTIN + Inv# + Date + Value)';
+            b.remarks = `Fully Matched. Total Invoice Value: ₹${b.invoiceValue.toFixed(2)}. ITC eligible.`;
+          } else {
+            b.reconStatus = 'partial';
+            const reasons = [];
+            if (!dateMatch) {
+              reasons.push(`Date differs: Books (${b.invoiceDate || 'Blank'}) vs 2B (${p.invoiceDate || 'Blank'})`);
+            }
+            if (!valMatch) {
+              reasons.push(`Invoice Value differs by ₹${valDiff.toFixed(2)} (Books ₹${b.invoiceValue.toFixed(2)} vs 2B ₹${p.invoiceValue.toFixed(2)})`);
+            }
+            const matchLabel = !dateMatch && !valMatch ? 'Date & Value Mismatch' : !dateMatch ? 'Date Mismatch' : 'Value Mismatch';
+            b.matchType = `Partially Matched (${matchLabel})`;
+            b.remarks = reasons.join('; ');
+          }
+        });
+
+        // --- Classify All Books Records ---
+        books.forEach(b => {
+          if (b.reconStatus) {
+            reconList.push(this.createReconRecord(b, b.matchedRecord, b.reconStatus, b.matchType, b.remarks));
+          } else {
+            let status = 'missing-2b';
+            let remarks = `Missing in GSTR-2B: Total Invoice Value ₹${b.invoiceValue.toFixed(2)} at risk. Supplier may not have filed GSTR-1.`;
+
+            if (!b.isGSTINValid) {
+              status = 'invalid';
+              remarks = `Invalid GSTIN format ('${b.rawGSTIN}'). Verify vendor GST registration.`;
+            } else if (b.isDuplicate) {
+              status = 'duplicate';
+              remarks = `Duplicate invoice in Books (${b.invoiceNumber}). Multiple records share normalized key (${b.gstin}|${b.normalizedInvNo}).`;
+            }
+
+            reconList.push(this.createReconRecord(b, null, status, 'In Books Only', remarks));
+          }
+        });
+
+        // --- Classify Unmatched Portal (GSTR-2B) Records ---
+        portal.forEach(p => {
+          if (matchedPortalIds.has(p.id)) return;
+
+          let status = 'missing-books';
+          let remarks = `Missing in Books: Total Invoice Value ₹${p.invoiceValue.toFixed(2)} available on portal. Check for missing purchase entry.`;
+
+          if (!p.isGSTINValid) {
+            status = 'invalid';
+            remarks = `Invalid GSTIN format in portal file ('${p.rawGSTIN}').`;
+          } else if (p.isDuplicate) {
+            status = 'duplicate';
+            remarks = `Duplicate invoice in 2B (${p.invoiceNumber}). Multiple records share normalized key (${p.gstin}|${p.normalizedInvNo}).`;
+          }
+
+          reconList.push(this.createReconRecord(null, p, status, 'In 2B Only', remarks));
+        });
+
+        appState.results = reconList;
+
+        // Compute Diagnostics Aid
+        appState.matchDiagnostics = {
+          booksTotal: books.length,
+          booksValidGSTIN: books.filter(b => b.isGSTINValid).length,
+          booksValidDate: books.filter(b => b.dateTimestamp > 0 || (b.invoiceDate && b.invoiceDate !== '-')).length,
+          booksNumericInvValue: books.filter(b => b.invoiceValue > 0).length,
+          portalTotal: portal.length,
+          portalValidGSTIN: portal.filter(p => p.isGSTINValid).length,
+          portalValidDate: portal.filter(p => p.dateTimestamp > 0 || (p.invoiceDate && p.invoiceDate !== '-')).length,
+          portalNumericInvValue: portal.filter(p => p.invoiceValue > 0).length,
+          keysMatched: matchedBooksIds.size,
+          unmatchedBooksSample: books.filter(b => !matchedBooksIds.has(b.id)).slice(0, 5)
+            .map(b => ({
+              key: (b.gstin || 'NO_GSTIN') + '|' + (b.normalizedInvNo || 'NO_INV'),
+              origInv: b.invoiceNumber || '-',
+              gstin: b.gstin || b.rawGSTIN || '-',
+              date: b.invoiceDate || '-',
+              invVal: b.invoiceValue || 0
+            })),
+          unmatchedPortalSample: portal.filter(p => !matchedPortalIds.has(p.id)).slice(0, 5)
+            .map(p => ({
+              key: (p.gstin || 'NO_GSTIN') + '|' + (p.normalizedInvNo || 'NO_INV'),
+              origInv: p.invoiceNumber || '-',
+              gstin: p.gstin || p.rawGSTIN || '-',
+              date: p.invoiceDate || '-',
+              invVal: p.invoiceValue || 0
+            }))
+        };
+        console.log('[GST Recon] Match Diagnostics Summary:', appState.matchDiagnostics);
+
+        // Calculate Aggregates & Metrics
+        this.computeMetrics(reconList);
+        this.computeSupplierSummary(reconList);
+      },
+
+      createReconRecord(booksRec, portalRec, status, matchType, remarks) {
+        const b = booksRec || {};
+        const p = portalRec || {};
+
+        const booksTax = b.totalTax || 0;
+        const portalTax = p.totalTax || 0;
+        const taxDiff = Math.round((booksTax - portalTax) * 100) / 100;
+
+        return {
+          id: `recon_${Math.random().toString(36).substr(2, 9)}`,
+          status,
+          matchType,
+          remarks,
+          gstin: b.gstin || p.gstin || '',
+          supplierName: b.supplierName || p.supplierName || 'Unknown Supplier',
+          booksInv: b.invoiceNumber || '-',
+          portalInv: p.invoiceNumber || '-',
+          booksDate: b.invoiceDate || '-',
+          portalDate: p.invoiceDate || '-',
+          booksTaxable: b.taxableValue !== undefined ? b.taxableValue : 0,
+          portalTaxable: p.taxableValue !== undefined ? p.taxableValue : 0,
+          booksTax,
+          portalTax,
+          taxDiff,
+          booksInvVal: b.invoiceValue !== undefined ? b.invoiceValue : 0,
+          portalInvVal: p.invoiceValue !== undefined ? p.invoiceValue : 0,
+          invValDiff: Math.round(((b.invoiceValue || 0) - (p.invoiceValue || 0)) * 100) / 100,
+          booksRecord: booksRec,
+          portalRecord: portalRec
+        };
+      },
+
+      computeMetrics(records) {
+        const m = {
+          totalBooks: appState.cleanedBooksRecords.length,
+          totalPortal: appState.cleanedPortalRecords.length,
+          matchedCount: 0,
+          matchedITC: 0,
+          partialCount: 0,
+          partialDiff: 0,
+          missing2BCount: 0,
+          atRiskITC: 0,
+          missingBooksCount: 0,
+          unclaimedITC: 0,
+          duplicateCount: 0,
+          invalidCount: 0
+        };
+
+        records.forEach(r => {
+          if (r.status === 'matched') {
+            m.matchedCount++;
+            m.matchedITC += r.portalTax;
+          } else if (r.status === 'partial') {
+            m.partialCount++;
+            m.partialDiff += Math.abs(r.taxDiff);
+          } else if (r.status === 'missing-2b') {
+            m.missing2BCount++;
+            m.atRiskITC += r.booksTax;
+          } else if (r.status === 'missing-books') {
+            m.missingBooksCount++;
+            m.unclaimedITC += r.portalTax;
+          } else if (r.status === 'duplicate') {
+            m.duplicateCount++;
+          } else if (r.status === 'invalid') {
+            m.invalidCount++;
+          }
+        });
+
+        appState.metrics = m;
+      },
+
+      computeSupplierSummary(records) {
+        const suppMap = new Map();
+
+        records.forEach(r => {
+          const key = r.gstin || r.supplierName;
+          if (!suppMap.has(key)) {
+            suppMap.set(key, {
+              gstin: r.gstin,
+              supplierName: r.supplierName,
+              totalInvoices: 0,
+              matched: 0,
+              partial: 0,
+              missing2B: 0,
+              missingBooks: 0,
+              booksTax: 0,
+              portalTax: 0,
+              atRiskTax: 0
+            });
+          }
+
+          const s = suppMap.get(key);
+          s.totalInvoices++;
+          s.booksTax += r.booksTax;
+          s.portalTax += r.portalTax;
+
+          if (r.status === 'matched') {
+            s.matched++;
+          } else if (r.status === 'partial') {
+            s.partial++;
+          } else if (r.status === 'missing-2b') {
+            s.missing2B++;
+            s.atRiskTax += r.booksTax;
+          } else if (r.status === 'missing-books') {
+            s.missingBooks++;
+          }
+        });
+
+        const summaryList = Array.from(suppMap.values());
+        // Sort suppliers by highest risk tax descending
+        summaryList.sort((a, b) => b.atRiskTax - a.atRiskTax || b.booksTax - a.booksTax);
+
+        appState.supplierSummary = summaryList;
+      },
+
+      // --- Dashboard Rendering ---
+      renderDashboard() {
+        const m = appState.metrics;
+
+        // Update KPI Cards
+        document.getElementById('kpiTotalInvoices').textContent = (m.totalBooks + m.totalPortal).toLocaleString('en-IN');
+        document.getElementById('kpiBooksCount').textContent = m.totalBooks.toLocaleString('en-IN');
+        document.getElementById('kpi2BCount').textContent = m.totalPortal.toLocaleString('en-IN');
+
+        document.getElementById('kpiMatchedCount').textContent = m.matchedCount.toLocaleString('en-IN');
+        document.getElementById('kpiMatchedITC').textContent = this.formatCurrency(m.matchedITC);
+
+        document.getElementById('kpiPartialCount').textContent = m.partialCount.toLocaleString('en-IN');
+        document.getElementById('kpiPartialDiff').textContent = this.formatCurrency(m.partialDiff);
+
+        document.getElementById('kpiMissing2BCount').textContent = m.missing2BCount.toLocaleString('en-IN');
+        document.getElementById('kpiAtRiskITC').textContent = this.formatCurrency(m.atRiskITC);
+
+        document.getElementById('kpiMissingBooksCount').textContent = m.missingBooksCount.toLocaleString('en-IN');
+        document.getElementById('kpiUnclaimedITC').textContent = this.formatCurrency(m.unclaimedITC);
+
+        // Update Tab Counts
+        document.getElementById('tabCountAll').textContent = appState.results.length.toLocaleString('en-IN');
+        document.getElementById('tabCountMatched').textContent = m.matchedCount.toLocaleString('en-IN');
+        document.getElementById('tabCountPartial').textContent = m.partialCount.toLocaleString('en-IN');
+        document.getElementById('tabCountMissing2B').textContent = m.missing2BCount.toLocaleString('en-IN');
+        document.getElementById('tabCountMissingBooks').textContent = m.missingBooksCount.toLocaleString('en-IN');
+        document.getElementById('tabCountDuplicate').textContent = m.duplicateCount.toLocaleString('en-IN');
+        document.getElementById('tabCountInvalid').textContent = m.invalidCount.toLocaleString('en-IN');
+
+        // Render Supplier Table
+        this.renderSupplierTable();
+
+        // Render Results Table
+        this.renderReconciliationTable();
+
+        // Render Canvas Charts
+        this.renderCharts();
+
+        // Render Match Diagnostics Panel
+        this.renderMatchDiagnostics();
+      },
+
+      renderMatchDiagnostics() {
+        const d = appState.matchDiagnostics;
+        if (!d) return;
+        const panel = document.getElementById('matchDiagnosticsPanel');
+        if (!panel) return;
+
+        const sampleRow = (item) => `<tr>
+          <td><code style="word-break: break-all; font-size: 0.76rem;">${this.escapeHtml(item.key)}</code></td>
+          <td>${this.escapeHtml(item.origInv)}</td>
+          <td><code>${this.escapeHtml(item.gstin)}</code></td>
+          <td>${this.escapeHtml(item.date)}</td>
+          <td style="font-weight: 600;">₹${Number(item.invVal).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+        </tr>`;
+
+        panel.innerHTML = `
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+            <div class="metric-card total" style="padding: 0.9rem;">
+              <div class="metric-title" style="font-size: 0.72rem;">Purchase Register (Books)</div>
+              <div class="metric-value" style="font-size: 1.4rem;">${d.booksTotal.toLocaleString('en-IN')}</div>
+              <div class="metric-sub" style="font-size: 0.74rem;">Valid GSTIN: <strong>${d.booksValidGSTIN}</strong> &bull; Valid Date: <strong>${d.booksValidDate}</strong> &bull; Value &gt; 0: <strong>${d.booksNumericInvValue}</strong></div>
+            </div>
+            <div class="metric-card total" style="padding: 0.9rem;">
+              <div class="metric-title" style="font-size: 0.72rem;">GSTR-2B Portal Records</div>
+              <div class="metric-value" style="font-size: 1.4rem;">${d.portalTotal.toLocaleString('en-IN')}</div>
+              <div class="metric-sub" style="font-size: 0.74rem;">Valid GSTIN: <strong>${d.portalValidGSTIN}</strong> &bull; Valid Date: <strong>${d.portalValidDate}</strong> &bull; Value &gt; 0: <strong>${d.portalNumericInvValue}</strong></div>
+            </div>
+            <div class="metric-card matched" style="padding: 0.9rem;">
+              <div class="metric-title" style="font-size: 0.72rem;">Keys Matched (O(1) Map)</div>
+              <div class="metric-value" style="font-size: 1.4rem; color: var(--success);">${d.keysMatched.toLocaleString('en-IN')}</div>
+              <div class="metric-sub" style="font-size: 0.74rem;">Keys: GSTIN + Normalized Invoice No</div>
+            </div>
+          </div>
+          ${d.unmatchedBooksSample && d.unmatchedBooksSample.length > 0 ? `
+          <div style="margin-bottom: 1rem;">
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--danger); margin-bottom: 0.4rem;">
+              ⚠️ Sample Unmatched Books Records (${d.unmatchedBooksSample.length} shown with normalized keys)
+            </div>
+            <div class="table-responsive" style="margin-top: 0; max-height: 180px; border: 1px solid var(--border);">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Normalized Key (GSTIN|Inv#)</th>
+                    <th>Original Invoice No</th>
+                    <th>GSTIN</th>
+                    <th>Invoice Date</th>
+                    <th>Total Inv Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${d.unmatchedBooksSample.map(sampleRow).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>` : ''}
+          ${d.unmatchedPortalSample && d.unmatchedPortalSample.length > 0 ? `
+          <div>
+            <div style="font-size: 0.82rem; font-weight: 700; color: var(--info); margin-bottom: 0.4rem;">
+              ℹ️ Sample Unmatched GSTR-2B Records (${d.unmatchedPortalSample.length} shown with normalized keys)
+            </div>
+            <div class="table-responsive" style="margin-top: 0; max-height: 180px; border: 1px solid var(--border);">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Normalized Key (GSTIN|Inv#)</th>
+                    <th>Original Invoice No</th>
+                    <th>GSTIN</th>
+                    <th>Invoice Date</th>
+                    <th>Total Inv Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${d.unmatchedPortalSample.map(sampleRow).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>` : ''}
+        `;
+      },
+
+      // --- HTML5 Canvas Charts (Zero external libraries) ---
+      renderCharts() {
+        this.drawStatusDonutChart();
+        this.drawITCBarChart();
+      },
+
+      drawStatusDonutChart() {
+        const canvas = document.getElementById('statusDonutChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+
+        // Support Retina display
+        canvas.width = 360 * dpr;
+        canvas.height = 240 * dpr;
+        ctx.scale(dpr, dpr);
+
+        ctx.clearRect(0, 0, 360, 240);
+
+        const m = appState.metrics;
+        const total = (m.matchedCount + m.partialCount + m.missing2BCount + m.missingBooksCount + m.duplicateCount + m.invalidCount) || 1;
+
+        const data = [
+          { label: 'Matched', value: m.matchedCount, color: '#10b981' },
+          { label: 'Partial Mismatch', value: m.partialCount, color: '#f59e0b' },
+          { label: 'Missing in 2B', value: m.missing2BCount, color: '#ef4444' },
+          { label: 'Missing in Books', value: m.missingBooksCount, color: '#6366f1' },
+          { label: 'Duplicates/Invalid', value: (m.duplicateCount + m.invalidCount), color: '#64748b' }
+        ].filter(d => d.value > 0);
+
+        const centerX = 120;
+        const centerY = 120;
+        const outerRadius = 85;
+        const innerRadius = 52;
+
+        let currentAngle = -Math.PI / 2;
+
+        data.forEach(slice => {
+          const sliceAngle = (slice.value / total) * (Math.PI * 2);
+          ctx.beginPath();
+          ctx.arc(centerX, centerY, outerRadius, currentAngle, currentAngle + sliceAngle);
+          ctx.arc(centerX, centerY, innerRadius, currentAngle + sliceAngle, currentAngle, true);
+          ctx.closePath();
+          ctx.fillStyle = slice.color;
+          ctx.fill();
+          currentAngle += sliceAngle;
+        });
+
+        // Center text
+        ctx.fillStyle = appState.theme === 'dark' ? '#f8fafc' : '#0f172a';
+        ctx.font = 'bold 20px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(total.toLocaleString('en-IN'), centerX, centerY - 8);
+
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+        ctx.fillStyle = appState.theme === 'dark' ? '#94a3b8' : '#64748b';
+        ctx.fillText('Records', centerX, centerY + 14);
+
+        // Legend on right side
+        const legendX = 230;
+        let legendY = 45;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        data.forEach(item => {
+          ctx.fillStyle = item.color;
+          ctx.beginPath();
+          ctx.arc(legendX, legendY, 5, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = appState.theme === 'dark' ? '#f8fafc' : '#0f172a';
+          ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+          const pct = ((item.value / total) * 100).toFixed(0);
+          ctx.fillText(`${item.label} (${pct}%)`, legendX + 12, legendY);
+
+          legendY += 28;
+        });
+      },
+
+      drawITCBarChart() {
+        const canvas = document.getElementById('itcBarChart');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const dpr = window.devicePixelRatio || 1;
+
+        canvas.width = 440 * dpr;
+        canvas.height = 240 * dpr;
+        ctx.scale(dpr, dpr);
+
+        ctx.clearRect(0, 0, 440, 240);
+
+        const m = appState.metrics;
+        const bars = [
+          { label: 'Matched ITC', value: m.matchedITC, color: '#10b981' },
+          { label: 'ITC at Risk', value: m.atRiskITC, color: '#ef4444' },
+          { label: 'Unclaimed ITC', value: m.unclaimedITC, color: '#6366f1' },
+          { label: 'Amount Diff', value: m.partialDiff, color: '#f59e0b' }
+        ];
+
+        const maxVal = Math.max(...bars.map(b => b.value), 100);
+        const chartLeft = 50;
+        const chartRight = 420;
+        const chartTop = 30;
+        const chartBottom = 195;
+        const chartHeight = chartBottom - chartTop;
+        const barWidth = 48;
+        const gap = (chartRight - chartLeft - (bars.length * barWidth)) / (bars.length + 1);
+
+        // Draw horizontal grid lines
+        ctx.strokeStyle = appState.theme === 'dark' ? '#1f2937' : '#e2e8f0';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+          const y = chartBottom - (i / 4) * chartHeight;
+          ctx.beginPath();
+          ctx.moveTo(chartLeft, y);
+          ctx.lineTo(chartRight, y);
+          ctx.stroke();
+
+          const gridVal = (maxVal * (i / 4));
+          ctx.fillStyle = appState.theme === 'dark' ? '#94a3b8' : '#64748b';
+          ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('₹' + this.formatCompact(gridVal), chartLeft - 6, y);
+        }
+
+        // Draw bars
+        bars.forEach((bar, idx) => {
+          const x = chartLeft + gap + idx * (barWidth + gap);
+          const barH = (bar.value / maxVal) * chartHeight;
+          const y = chartBottom - barH;
+
+          ctx.fillStyle = bar.color;
+          this.roundRect(ctx, x, y, barWidth, barH, 4);
+
+          // Top value text
+          ctx.fillStyle = appState.theme === 'dark' ? '#f8fafc' : '#0f172a';
+          ctx.font = 'bold 10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('₹' + this.formatCompact(bar.value), x + barWidth / 2, y - 6);
+
+          // Bottom label
+          ctx.fillStyle = appState.theme === 'dark' ? '#94a3b8' : '#64748b';
+          ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+          ctx.fillText(bar.label, x + barWidth / 2, chartBottom + 16);
+        });
+      },
+
+      roundRect(ctx, x, y, width, height, radius) {
+        if (height <= 0) return;
+        if (width < 2 * radius) radius = width / 2;
+        if (height < radius) radius = height;
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height);
+        ctx.lineTo(x, y + height);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+      },
+
+      formatCompact(num) {
+        if (num >= 10000000) return (num / 10000000).toFixed(1) + ' Cr';
+        if (num >= 100000) return (num / 100000).toFixed(1) + ' L';
+        if (num >= 1000) return (num / 1000).toFixed(1) + ' k';
+        return Math.round(num).toString();
+      },
+
+      // --- Supplier Summary Table ---
+      renderSupplierTable() {
+        const body = document.getElementById('supplierSummaryBody');
+        const list = appState.supplierSummary;
+
+        document.getElementById('supplierCountLabel').textContent = `${list.length} Suppliers Analyzed`;
+
+        if (list.length === 0) {
+          body.innerHTML = '<tr><td colspan="10" style="text-align: center; color: var(--text-muted);">No suppliers found</td></tr>';
+          return;
+        }
+
+        let html = '';
+        list.slice(0, 15).forEach(s => {
+          let actionRec = 'All Matched';
+          let actionColor = 'var(--success)';
+
+          if (s.missing2B > 0) {
+            actionRec = `Follow up with supplier for ${s.missing2B} missing invoices`;
+            actionColor = 'var(--danger)';
+          } else if (s.partial > 0) {
+            actionRec = 'Verify amount difference with supplier';
+            actionColor = 'var(--warning)';
+          } else if (s.missingBooks > 0) {
+            actionRec = 'Book missing invoices in accounting system';
+            actionColor = 'var(--info)';
+          }
+
+          html += `
+            <tr style="cursor: pointer;" onclick="app.filterBySupplier('${this.escapeHtml(s.gstin || s.supplierName)}')" title="Click to filter invoices for ${this.escapeHtml(s.supplierName)}">
+              <td><strong>${this.escapeHtml(s.supplierName)}</strong></td>
+              <td><code>${this.escapeHtml(s.gstin || '-')}</code></td>
+              <td>${s.totalInvoices}</td>
+              <td style="color: var(--success); font-weight: 600;">${s.matched}</td>
+              <td style="color: var(--warning); font-weight: 600;">${s.partial}</td>
+              <td style="color: var(--danger); font-weight: 600;">${s.missing2B}</td>
+              <td>${this.formatCurrency(s.booksTax)}</td>
+              <td>${this.formatCurrency(s.portalTax)}</td>
+              <td class="${s.atRiskTax > 0 ? 'diff-highlight' : ''}">${this.formatCurrency(s.atRiskTax)}</td>
+              <td style="font-size: 0.76rem; color: ${actionColor}; font-weight: 600;">${actionRec}</td>
+            </tr>
+          `;
+        });
+
+        body.innerHTML = html;
+      },
+
+      filterBySupplier(gstinOrName) {
+        document.getElementById('recordSearchInput').value = gstinOrName;
+        appState.searchQuery = gstinOrName.toLowerCase();
+        appState.currentPage = 1;
+        this.renderReconciliationTable();
+        document.getElementById('reconciliationMasterTable').scrollIntoView({ behavior: 'smooth' });
+      },
+
+      // --- Filter, Sort & Paginate Detailed Records ---
+      getFilteredRecords() {
+        let list = appState.results;
+
+        // Status Filter
+        if (appState.activeFilter !== 'all') {
+          list = list.filter(r => r.status === appState.activeFilter);
+        }
+
+        // Search Filter
+        if (appState.searchQuery) {
+          const q = appState.searchQuery;
+          list = list.filter(r =>
+            (r.supplierName && r.supplierName.toLowerCase().includes(q)) ||
+            (r.gstin && r.gstin.toLowerCase().includes(q)) ||
+            (r.booksInv && r.booksInv.toLowerCase().includes(q)) ||
+            (r.portalInv && r.portalInv.toLowerCase().includes(q)) ||
+            (r.remarks && r.remarks.toLowerCase().includes(q))
+          );
+        }
+
+        // Sorting
+        const col = appState.sortColumn;
+        const ord = appState.sortOrder === 'asc' ? 1 : -1;
+
+        list.sort((a, b) => {
+          let valA = a[col];
+          let valB = b[col];
+
+          if (typeof valA === 'number' && typeof valB === 'number') {
+            return (valA - valB) * ord;
+          }
+          valA = String(valA || '').toLowerCase();
+          valB = String(valB || '').toLowerCase();
+          return valA.localeCompare(valB) * ord;
+        });
+
+        return list;
+      },
+
+      sortTable(col) {
+        if (appState.sortColumn === col) {
+          appState.sortOrder = appState.sortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+          appState.sortColumn = col;
+          appState.sortOrder = 'asc';
+        }
+        this.renderReconciliationTable();
+      },
+
+      renderReconciliationTable() {
+        const body = document.getElementById('reconciliationTableBody');
+        const filtered = this.getFilteredRecords();
+        const total = filtered.length;
+
+        // Pagination calculations
+        const pageSize = appState.pageSize;
+        const totalPages = Math.ceil(total / pageSize) || 1;
+        if (appState.currentPage > totalPages) appState.currentPage = totalPages;
+        const startIdx = (appState.currentPage - 1) * pageSize;
+        const endIdx = Math.min(startIdx + pageSize, total);
+
+        const pageRecords = filtered.slice(startIdx, endIdx);
+
+        // Update pagination bar
+        document.getElementById('paginationInfo').textContent = total > 0
+          ? `Showing ${(startIdx + 1).toLocaleString('en-IN')} to ${endIdx.toLocaleString('en-IN')} of ${total.toLocaleString('en-IN')} records`
+          : 'No matching records found';
+        document.getElementById('currentPageLabel').textContent = `${appState.currentPage} / ${totalPages}`;
+        document.getElementById('btnPrevPage').disabled = appState.currentPage <= 1;
+        document.getElementById('btnNextPage').disabled = appState.currentPage >= totalPages;
+
+        if (pageRecords.length === 0) {
+          body.innerHTML = `
+            <tr>
+              <td colspan="14" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                No reconciliation records matching your current filter.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        let html = '';
+        pageRecords.forEach(r => {
+          const badgeClass = this.getBadgeClass(r.status);
+          const badgeText = this.getBadgeText(r.status);
+
+          html += `
+            <tr>
+              <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+              <td><code>${this.escapeHtml(r.gstin || '-')}</code></td>
+              <td><span title="${this.escapeHtml(r.supplierName)}">${this.escapeHtml(r.supplierName)}</span></td>
+              <td><strong>${this.escapeHtml(r.booksInv)}</strong></td>
+              <td><strong>${this.escapeHtml(r.portalInv)}</strong></td>
+              <td>${this.escapeHtml(r.booksDate)}</td>
+              <td>${this.escapeHtml(r.portalDate)}</td>
+              <td>${this.formatCurrency(r.booksTaxable)}</td>
+              <td>${this.formatCurrency(r.portalTaxable)}</td>
+              <td>${this.formatCurrency(r.booksTax)}</td>
+              <td>${this.formatCurrency(r.portalTax)}</td>
+              <td class="${Math.abs(r.taxDiff) > 0 ? 'diff-highlight' : ''}">${this.formatCurrency(r.taxDiff)}</td>
+              <td style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${this.escapeHtml(r.remarks)}">
+                ${this.escapeHtml(r.remarks)}
+              </td>
+              <td>
+                <button class="btn btn-outline btn-sm" onclick="app.openDetailModal('${r.id}')" style="padding: 2px 8px; font-size: 0.75rem;">
+                  Inspect
+                </button>
+              </td>
+            </tr>
+          `;
+        });
+
+        body.innerHTML = html;
+      },
+
+      getBadgeClass(status) {
+        switch (status) {
+          case 'matched': return 'badge-matched';
+          case 'partial': return 'badge-partial';
+          case 'missing-2b': return 'badge-missing-2b';
+          case 'missing-books': return 'badge-missing-books';
+          case 'duplicate': return 'badge-duplicate';
+          case 'invalid': return 'badge-invalid';
+          default: return 'badge-duplicate';
+        }
+      },
+
+      getBadgeText(status) {
+        switch (status) {
+          case 'matched': return 'Matched';
+          case 'partial': return 'Partial';
+          case 'missing-2b': return 'Missing in 2B';
+          case 'missing-books': return 'Missing in Books';
+          case 'duplicate': return 'Duplicate';
+          case 'invalid': return 'Invalid GSTIN';
+          default: return status;
+        }
+      },
+
+      // --- Side-by-Side Detail Inspection Modal ---
+      openDetailModal(recordId) {
+        const r = appState.results.find(item => item.id === recordId);
+        if (!r) return;
+
+        const modal = document.getElementById('detailModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const modalBody = document.getElementById('modalBody');
+
+        modalTitle.textContent = `Invoice Inspection: ${r.supplierName}`;
+
+        const b = r.booksRecord || {};
+        const p = r.portalRecord || {};
+
+        modalBody.innerHTML = `
+          <div style="background: var(--bg-surface-alt); padding: 1rem; border-radius: var(--radius-sm); border-left: 4px solid var(--primary); margin-bottom: 1.25rem;">
+            <div style="font-weight: 700; font-size: 0.95rem; margin-bottom: 0.25rem;">
+              Status: <span class="badge ${this.getBadgeClass(r.status)}">${this.getBadgeText(r.status)}</span> 
+              <span style="font-weight: normal; color: var(--text-muted); font-size: 0.82rem; margin-left: 0.5rem;">Match Type: ${r.matchType}</span>
+            </div>
+            <div style="font-size: 0.85rem; color: var(--text-main);">
+              <strong>Action Required:</strong> ${this.escapeHtml(r.remarks)}
+            </div>
+          </div>
+
+          <div class="compare-grid">
+            <div class="compare-side">
+              <h4>📖 Purchase Register (Books)</h4>
+              <div class="prop-row"><span class="prop-key">Supplier GSTIN</span><span class="prop-val">${this.escapeHtml(b.gstin || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Supplier Name</span><span class="prop-val">${this.escapeHtml(b.supplierName || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Invoice Number</span><span class="prop-val">${this.escapeHtml(b.invoiceNumber || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Normalized Inv #</span><span class="prop-val">${this.escapeHtml(b.normalizedInvNo || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Invoice Date</span><span class="prop-val">${this.escapeHtml(b.invoiceDate || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Taxable Value</span><span class="prop-val">${this.formatCurrency(b.taxableValue || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">CGST</span><span class="prop-val">${this.formatCurrency(b.cgst || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">SGST</span><span class="prop-val">${this.formatCurrency(b.sgst || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">IGST</span><span class="prop-val">${this.formatCurrency(b.igst || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">Total Tax</span><span class="prop-val">${this.formatCurrency(b.totalTax || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">Invoice Value</span><span class="prop-val">${this.formatCurrency(b.invoiceValue || 0)}</span></div>
+            </div>
+
+            <div class="compare-side">
+              <h4>🏛️ GSTR-2B (Portal Data)</h4>
+              <div class="prop-row"><span class="prop-key">Supplier GSTIN</span><span class="prop-val">${this.escapeHtml(p.gstin || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Supplier Name</span><span class="prop-val">${this.escapeHtml(p.supplierName || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Invoice Number</span><span class="prop-val">${this.escapeHtml(p.invoiceNumber || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Normalized Inv #</span><span class="prop-val">${this.escapeHtml(p.normalizedInvNo || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Invoice Date</span><span class="prop-val">${this.escapeHtml(p.invoiceDate || '-')}</span></div>
+              <div class="prop-row"><span class="prop-key">Taxable Value</span><span class="prop-val">${this.formatCurrency(p.taxableValue || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">CGST</span><span class="prop-val">${this.formatCurrency(p.cgst || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">SGST</span><span class="prop-val">${this.formatCurrency(p.sgst || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">IGST</span><span class="prop-val">${this.formatCurrency(p.igst || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">Total Tax</span><span class="prop-val">${this.formatCurrency(p.totalTax || 0)}</span></div>
+              <div class="prop-row"><span class="prop-key">Invoice Value</span><span class="prop-val">${this.formatCurrency(p.invoiceValue || 0)}</span></div>
+            </div>
+          </div>
+        `;
+
+        modal.classList.add('open');
+      },
+
+      closeModal() {
+        document.getElementById('detailModal').classList.remove('open');
+      },
+
+      // --- Multi-Sheet Excel Export (SheetJS) ---
+      exportExcel() {
+        if (!appState.results || appState.results.length === 0) {
+          alert('No reconciliation data available to export.');
+          return;
+        }
+
+        this.showLoading('Generating Excel Report...', 'Building 7 worksheets with formatted analysis');
+
+        setTimeout(() => {
+          try {
+            const wb = XLSX.utils.book_new();
+            const m = appState.metrics;
+
+            // Sheet 1: Summary Sheet
+            const summaryAOA = [
+              ['GST RECONCILIATION AUDIT & ANALYSIS REPORT'],
+              ['Generated On', new Date().toLocaleString('en-IN')],
+              ['Tool', 'Automated GST Reconciliation Portal (Client-Side)'],
+              [''],
+              ['EXECUTIVE METRICS', 'COUNT', 'ITC AMOUNT (INR)', 'REMARKS'],
+              ['Total Purchase Register Invoices', m.totalBooks, '', 'Invoices booked in company ERP'],
+              ['Total GSTR-2B Invoices', m.totalPortal, '', 'Invoices available on GST portal'],
+              ['Fully Matched Invoices', m.matchedCount, m.matchedITC, '100% verified ITC - eligible to claim'],
+              ['Partially Matched / Mismatched', m.partialCount, m.partialDiff, 'Invoices with tax differences'],
+              ['Missing in GSTR-2B (At Risk)', m.missing2BCount, m.atRiskITC, 'ITC at risk - Supplier follow-up required'],
+              ['Missing in Books (Unclaimed)', m.missingBooksCount, m.unclaimedITC, 'Available on portal - check booking'],
+              ['Duplicate Invoices', m.duplicateCount, '', 'Potential double-booking risk'],
+              ['Invalid GSTINs', m.invalidCount, '', 'GSTIN format validation failure'],
+              [''],
+              ['FINANCIAL ITC SUMMARY'],
+              ['Total Eligible ITC (Matched)', m.matchedITC],
+              ['Total ITC at Risk (Missing in 2B)', m.atRiskITC],
+              ['Total Unclaimed ITC (Missing in Books)', m.unclaimedITC],
+              ['Total Tax Amount Difference', m.partialDiff]
+            ];
+            const wsSummary = XLSX.utils.aoa_to_sheet(summaryAOA);
+            wsSummary['!cols'] = [{ wch: 38 }, { wch: 15 }, { wch: 22 }, { wch: 45 }];
+            XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+            // Sheet 2: Master Reconciliation Sheet
+            const masterRows = appState.results.map(r => ({
+              'Status': this.getBadgeText(r.status),
+              'Match Type': r.matchType,
+              'Supplier GSTIN': r.gstin,
+              'Supplier Name': r.supplierName,
+              'Books Inv #': r.booksInv,
+              '2B Inv #': r.portalInv,
+              'Books Inv Date': r.booksDate,
+              '2B Inv Date': r.portalDate,
+              'Books Taxable (INR)': r.booksTaxable,
+              '2B Taxable (INR)': r.portalTaxable,
+              'Books Total Tax (INR)': r.booksTax,
+              '2B Total Tax (INR)': r.portalTax,
+              'Tax Difference (INR)': r.taxDiff,
+              'Remarks / Action Required': r.remarks
+            }));
+            const wsMaster = XLSX.utils.json_to_sheet(masterRows);
+            wsMaster['!cols'] = [
+              { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 30 }, { wch: 16 }, { wch: 16 },
+              { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 },
+              { wch: 18 }, { wch: 50 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsMaster, 'Reconciliation');
+
+            // Sheet 3: Matched
+            const matchedRows = masterRows.filter(r => r.Status === 'Matched');
+            const wsMatched = XLSX.utils.json_to_sheet(matchedRows.length > 0 ? matchedRows : [{ 'Notice': 'No matched records' }]);
+            wsMatched['!cols'] = wsMaster['!cols'];
+            XLSX.utils.book_append_sheet(wb, wsMatched, 'Matched');
+
+            // Sheet 4: Mismatched / Partial
+            const partialRows = masterRows.filter(r => r.Status === 'Partial');
+            const wsPartial = XLSX.utils.json_to_sheet(partialRows.length > 0 ? partialRows : [{ 'Notice': 'No partial mismatch records' }]);
+            wsPartial['!cols'] = wsMaster['!cols'];
+            XLSX.utils.book_append_sheet(wb, wsPartial, 'Mismatched');
+
+            // Sheet 5: Missing in GSTR-2B
+            const missing2BRows = masterRows.filter(r => r.Status === 'Missing in 2B');
+            const wsMissing2B = XLSX.utils.json_to_sheet(missing2BRows.length > 0 ? missing2BRows : [{ 'Notice': 'No records missing in 2B' }]);
+            wsMissing2B['!cols'] = wsMaster['!cols'];
+            XLSX.utils.book_append_sheet(wb, wsMissing2B, 'Missing in GSTR-2B');
+
+            // Sheet 6: Missing in Books
+            const missingBooksRows = masterRows.filter(r => r.Status === 'Missing in Books');
+            const wsMissingBooks = XLSX.utils.json_to_sheet(missingBooksRows.length > 0 ? missingBooksRows : [{ 'Notice': 'No records missing in Books' }]);
+            wsMissingBooks['!cols'] = wsMaster['!cols'];
+            XLSX.utils.book_append_sheet(wb, wsMissingBooks, 'Missing in Books');
+
+            // Sheet 7: Supplier Summary
+            const supplierRows = appState.supplierSummary.map(s => ({
+              'Supplier Name': s.supplierName,
+              'Supplier GSTIN': s.gstin,
+              'Total Invoices': s.totalInvoices,
+              'Matched Invoices': s.matched,
+              'Mismatched Invoices': s.partial,
+              'Missing in 2B Invoices': s.missing2B,
+              'Books Total Tax (INR)': s.booksTax,
+              '2B Total Tax (INR)': s.portalTax,
+              'ITC at Risk (INR)': s.atRiskTax,
+              'Action Recommendation': s.atRiskTax > 0 ? 'Follow up with supplier' : (s.partial > 0 ? 'Verify amount mismatch' : 'Compliant')
+            }));
+            const wsSupp = XLSX.utils.json_to_sheet(supplierRows);
+            wsSupp['!cols'] = [
+              { wch: 32 }, { wch: 18 }, { wch: 14 }, { wch: 16 }, { wch: 18 }, { wch: 20 },
+              { wch: 20 }, { wch: 20 }, { wch: 18 }, { wch: 26 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsSupp, 'Supplier Summary');
+
+            // Write File
+            let fileName = document.getElementById('exportFileName').value.trim();
+            if (!fileName.endsWith('.xlsx')) fileName += '.xlsx';
+
+            XLSX.writeFile(wb, fileName);
+          } catch (err) {
+            console.error(err);
+            alert(`Error generating Excel file: ${err.message}`);
+          } finally {
+            this.hideLoading();
+          }
+        }, 100);
+      },
+
+      // --- Realistic Sample Data Generator ---
+      loadSampleData() {
+        this.showLoading('Generating Realistic Sample Data...', 'Creating 25+ real-world invoice cases');
+
+        setTimeout(() => {
+          const sampleBooks = [
+            // Self-Check Reference Case (Must match with ABC/26-27/0045 vs ABC-26-27-45)
+            { "GSTIN": "27AAACX9999X1Z1", "Party Name": "Self Check Industries", "Invoice No": "ABC/26-27/0045", "Date": "15-10-2026", "Basic Value": 100000, "CGST": 9000, "State Tax": 9000, "IGST": 0, "Total Tax": 18000, "Invoice Value": 118000 },
+
+            // Exact Matches
+            { "GSTIN": "27AAACT2727Q1ZB", "Party Name": "Tata Steel Limited", "Invoice No": "INV-2024-001", "Date": "12/04/2024", "Basic Value": 100000, "CGST": 9000, "State Tax": 9000, "IGST": 0, "Total Tax": 18000, "Invoice Value": 118000 },
+            { "GSTIN": "29AABCU9603R1ZM", "Party Name": "Infosys Technologies", "Invoice No": "INF/BLR/9021", "Date": "15/04/2024", "Basic Value": 250000, "CGST": 0, "State Tax": 0, "IGST": 45000, "Total Tax": 45000, "Invoice Value": 295000 },
+            { "GSTIN": "27AAACL1234P1Z5", "Party Name": "Larsen & Toubro Ltd", "Invoice No": "LT-2024-884", "Date": "18/04/2024", "Basic Value": 85000, "CGST": 7650, "State Tax": 7650, "IGST": 0, "Total Tax": 15300, "Invoice Value": 100300 },
+            { "GSTIN": "33AABCR1234A1Z1", "Party Name": "Reliance Retail Ltd", "Invoice No": "RR/CHE/4401", "Date": "20/04/2024", "Basic Value": 45000, "CGST": 0, "State Tax": 0, "IGST": 8100, "Total Tax": 8100, "Invoice Value": 53100 },
+            
+            // Fuzzy Typo in Invoice Number (e.g. INV-104 vs INV/104 or INV0104)
+            { "GSTIN": "07AAACG9999K1Z4", "Party Name": "Godrej Consumer Products", "Invoice No": "INV-GC-501", "Date": "22/04/2024", "Basic Value": 120000, "CGST": 10800, "State Tax": 10800, "IGST": 0, "Total Tax": 21600, "Invoice Value": 141600 },
+            { "GSTIN": "06AAACT0001E1Z0", "Party Name": "Tech Mahindra Ltd", "Invoice No": "TM/HR/0088", "Date": "24/04/2024", "Basic Value": 300000, "CGST": 0, "State Tax": 0, "IGST": 54000, "Total Tax": 54000, "Invoice Value": 354000 },
+            
+            // Amount Mismatch (Books tax higher than 2B or rounding difference)
+            { "GSTIN": "24AAACW2222N1Z8", "Party Name": "Wipro Enterprises", "Invoice No": "WIP/AHM/102", "Date": "25/04/2024", "Basic Value": 60000, "CGST": 5400, "State Tax": 5400, "IGST": 0, "Total Tax": 10800, "Invoice Value": 70800 },
+            { "GSTIN": "27AABCM3333F1Z7", "Party Name": "Mahindra & Mahindra Ltd", "Invoice No": "MM-PUN-304", "Date": "26/04/2024", "Basic Value": 450000, "CGST": 40500, "State Tax": 40500, "IGST": 0, "Total Tax": 81000, "Invoice Value": 531000 },
+            
+            // Amount & Date Match (Invoice number completely different like PO number vs Tax invoice)
+            { "GSTIN": "29AAACB4444G1Z6", "Party Name": "Bosch Limited", "Invoice No": "PO-99214", "Date": "28/04/2024", "Basic Value": 180000, "CGST": 0, "State Tax": 0, "IGST": 32400, "Total Tax": 32400, "Invoice Value": 212400 },
+            
+            // Missing in GSTR-2B (In Books Only - ITC at risk!)
+            { "GSTIN": "07AAACD5555L1Z5", "Party Name": "Delhi Logistics Hub", "Invoice No": "DLH-042", "Date": "02/05/2024", "Basic Value": 75000, "CGST": 6750, "State Tax": 6750, "IGST": 0, "Total Tax": 13500, "Invoice Value": 88500 },
+            { "GSTIN": "19AAACH6666J1Z4", "Party Name": "Hindustan Engineering Co", "Invoice No": "HEC/KOL/771", "Date": "04/05/2024", "Basic Value": 520000, "CGST": 0, "State Tax": 0, "IGST": 93600, "Total Tax": 93600, "Invoice Value": 613600 },
+            { "GSTIN": "36AAACB7777K1Z3", "Party Name": "Bharat Heavy Electricals", "Invoice No": "BHEL/HYD/12", "Date": "06/05/2024", "Basic Value": 340000, "CGST": 0, "State Tax": 0, "IGST": 61200, "Total Tax": 61200, "Invoice Value": 401200 },
+            
+            // Duplicate Entry in Books
+            { "GSTIN": "27AAACT2727Q1ZB", "Party Name": "Tata Steel Limited", "Invoice No": "INV-2024-001", "Date": "12/04/2024", "Basic Value": 100000, "CGST": 9000, "State Tax": 9000, "IGST": 0, "Total Tax": 18000, "Invoice Value": 118000 },
+            
+            // Invalid GSTIN Format
+            { "GSTIN": "27INVALIDGSTIN1", "Party Name": "Local Hardware Store", "Invoice No": "CASH-091", "Date": "08/05/2024", "Basic Value": 15000, "CGST": 1350, "State Tax": 1350, "IGST": 0, "Total Tax": 2700, "Invoice Value": 17700 }
+          ];
+
+          const samplePortal = [
+            // Self-Check Reference Case
+            { "Supplier GSTIN": "27AAACX9999X1Z1", "Trade/Legal name": "Self Check Industries", "Invoice Number": "ABC-26-27-45", "Invoice Date": "15/10/2026", "Basic Amt": 100000, "Integrated Tax": 0, "Central Tax": 9000, "State/UT Tax": 9000, "Invoice Value": 118000.00 },
+
+            // Exact Matches - Notice: Trade/Legal name, Basic Amt, Central Tax, State/UT Tax, Integrated Tax, and unmapped Total Tax
+            { "Supplier GSTIN": "27AAACT2727Q1ZB", "Trade/Legal name": "Tata Steel Limited", "Invoice Number": "INV-2024-001", "Invoice Date": "12/04/2024", "Basic Amt": 100000, "Integrated Tax": 0, "Central Tax": 9000, "State/UT Tax": 9000, "Invoice Value": 118000 },
+            { "Supplier GSTIN": "29AABCU9603R1ZM", "Trade/Legal name": "Infosys Technologies", "Invoice Number": "INF/BLR/9021", "Invoice Date": "15/04/2024", "Basic Amt": 250000, "Integrated Tax": 45000, "Central Tax": 0, "State/UT Tax": 0, "Invoice Value": 295000 },
+            { "Supplier GSTIN": "27AAACL1234P1Z5", "Trade/Legal name": "Larsen & Toubro Ltd", "Invoice Number": "LT-2024-884", "Invoice Date": "18/04/2024", "Basic Amt": 85000, "Integrated Tax": 0, "Central Tax": 7650, "State/UT Tax": 7650, "Invoice Value": 100300 },
+            { "Supplier GSTIN": "33AABCR1234A1Z1", "Trade/Legal name": "Reliance Retail Ltd", "Invoice Number": "RR/CHE/4401", "Invoice Date": "20/04/2024", "Basic Amt": 45000, "Integrated Tax": 8100, "Central Tax": 0, "State/UT Tax": 0, "Invoice Value": 53100 },
+            
+            // Corresponding Fuzzy Typo Invoices in Portal (INV/GC/501 vs INV-GC-501, TM-HR-88 vs TM/HR/0088)
+            { "Supplier GSTIN": "07AAACG9999K1Z4", "Trade/Legal name": "Godrej Consumer Products", "Invoice Number": "INV/GC/501", "Invoice Date": "22/04/2024", "Basic Amt": 120000, "Integrated Tax": 0, "Central Tax": 10800, "State/UT Tax": 10800, "Invoice Value": 141600 },
+            { "Supplier GSTIN": "06AAACT0001E1Z0", "Trade/Legal name": "Tech Mahindra Ltd", "Invoice Number": "TM-HR-88", "Invoice Date": "25/04/2024", "Basic Amt": 300000, "Integrated Tax": 54000, "Central Tax": 0, "State/UT Tax": 0, "Invoice Value": 354000 },
+            
+            // Corresponding Amount Mismatch in Portal (e.g. portal has lower tax or different base)
+            { "Supplier GSTIN": "24AAACW2222N1Z8", "Trade/Legal name": "Wipro Enterprises", "Invoice Number": "WIP/AHM/102", "Invoice Date": "25/04/2024", "Basic Amt": 55000, "Integrated Tax": 0, "Central Tax": 4950, "State/UT Tax": 4950, "Invoice Value": 64900 },
+            { "Supplier GSTIN": "27AABCM3333F1Z7", "Trade/Legal name": "Mahindra & Mahindra Ltd", "Invoice Number": "MM-PUN-304", "Invoice Date": "26/04/2024", "Basic Amt": 450000, "Integrated Tax": 0, "Central Tax": 40400, "State/UT Tax": 40400, "Invoice Value": 530800 },
+            
+            // Amount & Date Match candidate (Vendor billed with INV-BOS-99214 instead of PO-99214)
+            { "Supplier GSTIN": "29AAACB4444G1Z6", "Trade/Legal name": "Bosch Limited", "Invoice Number": "INV-BOS-99214", "Invoice Date": "29/04/2024", "Basic Amt": 180000, "Integrated Tax": 32400, "Central Tax": 0, "State/UT Tax": 0, "Invoice Value": 212400 },
+            
+            // Missing in Books (Portal has invoices not yet booked in company accounting!)
+            { "Supplier GSTIN": "27AAACZ8888P1Z2", "Trade/Legal name": "Adani Ports & SEZ", "Invoice Number": "APSEZ/24/099", "Invoice Date": "05/05/2024", "Basic Amt": 210000, "Integrated Tax": 0, "Central Tax": 18900, "State/UT Tax": 18900, "Invoice Value": 247800 },
+            { "Supplier GSTIN": "07AAACK9999M1Z1", "Trade/Legal name": "Kotak Mahindra Bank Ltd", "Invoice Number": "KMBL-CHG-1021", "Invoice Date": "07/05/2024", "Basic Amt": 18000, "Integrated Tax": 0, "Central Tax": 1620, "State/UT Tax": 1620, "Invoice Value": 21240 },
+            { "Supplier GSTIN": "29AAACN1111Q1Z0", "Trade/Legal name": "Narayana Hrudayalaya", "Invoice Number": "NH/MED/334", "Invoice Date": "10/05/2024", "Basic Amt": 95000, "Integrated Tax": 17100, "Central Tax": 0, "State/UT Tax": 0, "Invoice Value": 112100 }
+          ];
+
+          appState.rawBooksData = sampleBooks;
+          appState.rawBooksHeaders = Object.keys(sampleBooks[0]);
+          appState.booksFileName = 'Sample_Purchase_Register.xlsx';
+          appState.booksRowCount = sampleBooks.length;
+
+          appState.rawPortalData = samplePortal;
+          appState.rawPortalHeaders = Object.keys(samplePortal[0]);
+          appState.portalFileName = 'Sample_GSTR2B_Portal.xlsx';
+          appState.portalRowCount = samplePortal.length;
+
+          // Update Step 1 UI
+          document.getElementById('booksFileName').textContent = appState.booksFileName;
+          document.getElementById('booksRowCount').textContent = `(${sampleBooks.length} rows)`;
+          document.getElementById('booksFileInfo').style.display = 'block';
+
+          document.getElementById('portalFileName').textContent = appState.portalFileName;
+          document.getElementById('portalRowCount').textContent = `(${samplePortal.length} rows)`;
+          document.getElementById('portalFileInfo').style.display = 'block';
+
+          this.renderPreviewTable('booksPreviewTable', appState.rawBooksHeaders, sampleBooks.slice(0, 5));
+          document.getElementById('booksPreviewContainer').style.display = 'block';
+
+          this.renderPreviewTable('portalPreviewTable', appState.rawPortalHeaders, samplePortal.slice(0, 5));
+          document.getElementById('portalPreviewContainer').style.display = 'block';
+
+          this.checkReadyToProceed();
+          this.hideLoading();
+
+          // Auto proceed to mapping
+          this.goToStep(2);
+        }, 150);
+      },
+
+      // --- Utilities ---
+      escapeHtml(str) {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      },
+
+      formatCurrency(num) {
+        if (num === null || num === undefined || isNaN(num)) return '₹0.00';
+        return '₹' + Number(num).toLocaleString('en-IN', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+      }
+    };
+
+    // Initialize application on DOM ready
+    document.addEventListener('DOMContentLoaded', () => {
+      app.init();
+    });
+  </script>
+</body>
+</html>
